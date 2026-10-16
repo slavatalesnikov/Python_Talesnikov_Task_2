@@ -1,5 +1,6 @@
 """короткая демонстрация всех десяти маршрутов для защиты."""
 
+import argparse
 from time import monotonic, sleep
 
 from src.client import ApiClient
@@ -32,7 +33,10 @@ def wait_result(client):
 
 def main():
     """создаёт данные, получает docx и отчёт, затем удаляет записи."""
-    client = ApiClient()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--url', default='http://127.0.0.1:8000')
+    args = parser.parse_args()
+    client = ApiClient(args.url)
     try:
         show(client.put_actor_submit(DEMO_ACTOR, platform='macOS',
                                      user_agent='defence'))

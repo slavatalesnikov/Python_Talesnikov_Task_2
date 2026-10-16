@@ -8,3 +8,4 @@ radon==6.0.1
 python-docx==1.2.0
 markdown-it-py==4.2.0
 pytest==9.1.1
+tinydb==4.9.0

@@ -1,4 +1,4 @@
-"""MBT: независимая модель в словарях сравнивается с HTTP API."""
+"""тестирование MBT: независимая модель в словарях сравнивается с HTTP API."""
 
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
@@ -57,7 +57,8 @@ class ApiMachine(RuleBasedStateMachine):
 
     def make_app(self):
         """создаёт приложение с JSON-хранилищем второго этапа."""
-        return create_app(f'{self.directory.name}/database.json', True)
+        return create_app(f'{self.directory.name}/database.json', True,
+                          backend=self.backend)
 
     def data(self, response):
         """проверяет успешный статус и JSON каждого штатного запроса."""

@@ -1,0 +1,11 @@
+PUT /private/api/v2/submit/actor/22001 200 {'datetime': 1792169001, 'platform': 'macOS', 'user_agent': 'defence', 'uid': 22001}
+GET /private/api/v2/show/actor 200 [{'datetime': 1792169001, 'platform': 'macOS', 'user_agent': 'defence', 'uid': 22001}]
+POST /private/api/v2/revise/actor 200 {'datetime': 1792169001, 'platform': 'Python', 'user_agent': 'defence', 'uid': 22001}
+PUT /private/api/v2/submit/instruction/22002 200 {'datetime': 1792169001, 'input': '# Защита\n\n**Markdown** преобразуется в Docx.', 'actor': 22001, 'description': 'пример для защиты', 'tags': 'demo', 'stage': 'queued', 'uid': 22002}
+GET /private/api/v2/show/response/22002 200 []
+GET /private/api/v2/show/response/22002 200 [{'uid': 1, 'datetime': 1792169001, 'output': '/Users/slavatalesnikov/Desktop/task2/output/22002-63a717f4eac5483cac2b5b3719fbfd3c.docx', 'stage': 'done', 'failure': '', 'instruction': 22002}]
+GET /private/api/v2/show/instruction/22001 200 [{'datetime': 1792169001, 'input': '# Защита\n\n**Markdown** преобразуется в Docx.', 'actor': 22001, 'description': 'пример для защиты', 'tags': 'demo', 'stage': 'done', 'uid': 22002}]
+POST /private/api/v2/revise/instruction 200 {'datetime': 1792169001, 'input': '# Защита\n\n**Markdown** преобразуется в Docx.', 'actor': 22001, 'description': 'пример для защиты', 'tags': 'checked', 'stage': 'done', 'uid': 22002}
+GET /private/api/v2/show/report 200 [{'description': 'пример для защиты', 'output': '/Users/slavatalesnikov/Desktop/task2/output/22002-63a717f4eac5483cac2b5b3719fbfd3c.docx'}]
+DELETE /private/api/v2/pop/instruction/22002 200 {'deleted': True}
+DELETE /private/api/v2/pop/actor/22001 200 {'deleted': True}

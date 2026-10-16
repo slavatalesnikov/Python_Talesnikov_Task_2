@@ -1,0 +1,109 @@
+PEP8: passed, 19 Python files checked
+Maximum function length: 24 lines (limit 40)
+Maximum argument count: 5 (limit 7)
+Line length: <= 79 characters
+Comments: docstrings only
+
+src/tiny_storage.py
+    C 11:0 TinyStorage - A (3)
+    M 24:4 TinyStorage.load - A (3)
+    M 29:4 TinyStorage.save - A (2)
+    M 18:4 TinyStorage.__init__ - A (1)
+    M 40:4 TinyStorage.close - A (1)
+src/worker.py
+    M 21:4 Worker.execute - B (6)
+    C 12:0 Worker - A (5)
+    M 15:4 Worker.__init__ - A (1)
+src/server.py
+    F 13:0 main - A (2)
+src/client.py
+    C 9:0 ApiClient - A (2)
+    M 12:4 ApiClient.__init__ - A (2)
+    M 20:4 ApiClient.request - A (1)
+    M 24:4 ApiClient.put_actor_submit - A (1)
+    M 28:4 ApiClient.delete_actor_pop - A (1)
+    M 32:4 ApiClient.get_actor_show - A (1)
+    M 36:4 ApiClient.post_actor_revise - A (1)
+    M 41:4 ApiClient.put_instruction_submit - A (1)
+    M 45:4 ApiClient.delete_instruction_pop - A (1)
+    M 49:4 ApiClient.get_instruction_show - A (1)
+    M 54:4 ApiClient.post_instruction_revise - A (1)
+    M 59:4 ApiClient.get_response_show - A (1)
+    M 64:4 ApiClient.get_report_show - A (1)
+    M 68:4 ApiClient.close - A (1)
+src/converter.py
+    F 14:0 add_inline - B (8)
+    F 39:0 add_block - B (7)
+    F 58:0 convert - B (6)
+    F 84:0 main - A (1)
+src/model.py
+    M 63:4 Model.pop - B (9)
+    M 101:4 Model.report - B (7)
+    C 8:0 Model - A (5)
+    M 20:4 Model.find - A (4)
+    M 29:4 Model.validate - A (4)
+    M 85:4 Model.complete - A (4)
+    M 40:4 Model.submit - A (3)
+    M 51:4 Model.revise - A (3)
+    M 15:4 Model.__init__ - A (1)
+src/api.py
+    F 22:0 check_headers - A (5)
+    F 39:0 bad_request - A (1)
+    F 44:0 create_app - A (1)
+src/storage.py
+    M 14:4 JsonStorage.__init__ - A (3)
+    C 7:0 JsonStorage - A (2)
+    M 22:4 JsonStorage.load - A (1)
+    M 26:4 JsonStorage.save - A (1)
+    M 35:4 JsonStorage.close - A (1)
+src/demo.py
+    F 23:0 wait_result - A (3)
+    F 15:0 show - A (1)
+    F 34:0 main - A (1)
+src/schema.py
+    F 11:0 timestamp - A (1)
+    C 16:0 ActorData - A (1)
+    C 25:0 Actor - A (1)
+    C 31:0 InstructionData - A (1)
+    C 43:0 Instruction - A (1)
+    C 49:0 Response - A (1)
+src/routes.py
+    F 14:0 put_actor_submit - A (1)
+    F 23:0 delete_actor_pop - A (1)
+    F 29:0 get_actor_show - A (1)
+    F 35:0 post_actor_revise - A (1)
+    F 41:0 put_instruction_submit - A (1)
+    F 53:0 delete_instruction_pop - A (1)
+    F 59:0 get_instruction_show - A (1)
+    F 66:0 post_instruction_revise - A (1)
+    F 72:0 get_response_show - A (1)
+    F 79:0 get_report_show - A (1)
+tests/test_tiny_api.py
+    C 8:0 TinyApiMachine - A (1)
+tests/test_report.py
+    F 40:0 test_report_formula - A (4)
+    F 18:0 seed_report - A (1)
+tests/test_storage.py
+    F 13:0 test_reopen_storage - A (2)
+tests/test_worker.py
+    F 31:0 test_real_conversion - B (7)
+    F 48:0 test_conversion_failure - A (4)
+    F 19:0 submit_document - A (3)
+tests/test_api.py
+    M 184:4 ApiMachine.observe - B (8)
+    M 131:4 ApiMachine.remove_actor - B (6)
+    F 28:0 header_status - A (5)
+    C 37:0 ApiMachine - A (4)
+    M 98:4 ApiMachine.instruction_upsert - A (4)
+    M 122:4 ApiMachine.remove_instruction - A (4)
+    M 142:4 ApiMachine.filters - A (4)
+    M 159:4 ApiMachine.headers - A (4)
+    M 173:4 ApiMachine.invalid_changes - A (4)
+    M 63:4 ApiMachine.data - A (3)
+    M 84:4 ApiMachine.actor_upsert - A (3)
+    M 46:4 ApiMachine.__init__ - A (1)
+    M 58:4 ApiMachine.make_app - A (1)
+    M 70:4 ApiMachine.start - A (1)
+    M 206:4 ApiMachine.teardown - A (1)
+tests/test_converter.py
+    F 12:0 test_examples - A (3)

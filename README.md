@@ -71,7 +71,8 @@ INNER JOIN с Response по `Instruction.uid = Response.instruction`,
 - `Model`: `find`, `submit`, `revise`, `pop` — поиск, создание, изменение,
   удаление; `validate` проверяет поля и связи; `complete` сохраняет ответ;
   `report` вычисляет формулу 22.
-- `JsonStorage`: `load`, `save`, `close` — операции с JSON-файлом.
+- `JsonStorage` и `TinyStorage`: `load`, `save`, `close` — чтение,
+  сохранение и закрытие JSON-файла или документной базы TinyDB.
 - `Worker.execute` выполняет CLI; таймаут процесса — 60 секунд.
 - `create_app` собирает приложение; `check_headers` проверяет заголовки;
   `bad_request` оформляет ошибки модели. Функции `routes` соответствуют
@@ -80,9 +81,11 @@ INNER JOIN с Response по `Instruction.uid = Response.instruction`,
   `get_report_show` и т. д.; имена соответствуют методу, таблице и действию.
   `request` отправляет HTTP-запрос, `close` закрывает соединение.
 - `demo.main` демонстрирует API; `show` печатает ответ;
-  `wait_result` опрашивает результат до 10 секунд.
+  `wait_result` опрашивает результат до 10 секунд. Параметр `--url`
+  у демонстрации задаёт адрес сервера (по умолчанию порт 8000).
 
-`src.server` принимает `--database` (путь базы), `--output` (каталог Docx),
+`src.server` принимает `--backend` (`tinydb` по умолчанию или `json`),
+`--database` (путь базы, по умолчанию `data/<backend>.json`), `--output` (каталог Docx),
 `--port` (по умолчанию 8000), `--test-mode` (без subprocess, ответ test.docx).
 Тестовый режим не создаёт Docx. По умолчанию вычисления настоящие.
 Сервер слушает только `127.0.0.1` и работает в одном процессе.
@@ -116,7 +119,7 @@ curl -X PUT 'http://127.0.0.1:8000/private/api/v2/submit/actor/22?platform=macOS
 ### Этап 2
 
 ```sh
-./run.sh -m src.server --database data/json.json
+./run.sh -m src.server --backend json --database data/json.json
 ```
 
 Сервер остаётся работать в этом терминале. В другом терминале:
@@ -124,7 +127,7 @@ curl -X PUT 'http://127.0.0.1:8000/private/api/v2/submit/actor/22?platform=macOS
 ```sh
 ./run.sh -m src.demo
 ./run.sh -m coverage run --branch --source=src -m pytest tests/test_api.py tests/test_report.py -q
-.venv/bin/coverage report -m
+.venv/bin/coverage report -m --include='src/api.py,src/routes.py'
 ./run.sh -m pytest tests/test_worker.py -v
 ```
 
@@ -134,3 +137,30 @@ curl -X PUT 'http://127.0.0.1:8000/private/api/v2/submit/actor/22?platform=macOS
 Тесты MBT сравнивают API с независимой моделью, coverage учитывает ветви.
 Тест исполнителя отдельно проверяет настоящий subprocess и ошибки запуска.
 Сервер останавливается сочетанием Ctrl+C.
+
+### Этап 3
+
+```sh
+./run.sh -m src.server --backend tinydb --database data/tinydb.json
+```
+
+После остановки сервера второго этапа запускаем приложение с TinyDB.
+В другом терминале:
+
+```sh
+./run.sh -m src.demo
+./run.sh -m coverage run --branch --source=src -m pytest tests/test_tiny_api.py tests/test_report.py -q
+.venv/bin/coverage report -m --include='src/api.py,src/routes.py'
+./run.sh -m pytest -q
+.venv/bin/pycodestyle src tests
+.venv/bin/radon cc src tests -s
+```
+
+Первый запуск показывает те же 10 операций с базой TinyDB. Затем MBT
+повторяет проверки API с новым слоем доступа; coverage показывает покрытие
+обработчиков и ветвей проверки заголовков. Последние команды запускают все
+тесты (включая сохранность после открытия базы), PEP8 и проверку сложности.
+
+Чтобы показать режим без настоящего преобразования, остановить сервер и
+запустить `./run.sh -m src.server --test-mode`, затем `./run.sh -m src.demo`.
+В ответе будет `test.docx`, настоящий файл в этом режиме не создаётся.

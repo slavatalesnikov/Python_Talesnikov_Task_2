@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 from src.model import Model
 from src.routes import router
 from src.storage import JsonStorage
+from src.tiny_storage import TinyStorage
 from src.worker import Worker
 
 
@@ -41,8 +42,8 @@ async def bad_request(request: Request, error: Exception):
 
 
 def create_app(path='data/database.json', test_mode=False,
-               output_dir='output'):
-    """создаёт приложение с файловым хранилищем второго этапа."""
+               output_dir='output', backend='tinydb'):
+    """создаёт приложение; по умолчанию используется TinyDB третьего этапа."""
     @asynccontextmanager
     async def lifespan(app):
         """закрывает хранилище после остановки сервера."""
@@ -50,7 +51,8 @@ def create_app(path='data/database.json', test_mode=False,
         app.state.model.storage.close()
 
     app = FastAPI(title='Markdown -> Docx, вариант 22', lifespan=lifespan)
-    app.state.model = Model(JsonStorage(path))
+    storage_class = {'json': JsonStorage, 'tinydb': TinyStorage}[backend]
+    app.state.model = Model(storage_class(path))
     app.state.worker = Worker(app.state.model, output_dir, test_mode)
     app.middleware('http')(check_headers)
     app.add_exception_handler(ValueError, bad_request)
