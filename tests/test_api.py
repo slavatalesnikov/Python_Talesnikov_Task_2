@@ -49,7 +49,8 @@ class ApiMachine(RuleBasedStateMachine):
 
     def make_app(self):
         """использует файловое JSON-хранилище второго этапа."""
-        return create_app(f'{self.directory.name}/db.json', True)
+        return create_app(f'{self.directory.name}/db', True,
+                          backend=self.backend)
 
     def data(self, response):
         """требует 200 OK и XML для каждого штатного запроса."""

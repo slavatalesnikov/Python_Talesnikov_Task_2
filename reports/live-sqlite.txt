@@ -1,0 +1,24 @@
+200 <?xml version='1.0' encoding='utf-8'?>
+<response kind="object"><created type="int">1792349716</created><ip type="str">127.0.0.1</ip><locale type="str">ru</locale><platform type="str">mac</platform><identifier type="int">24001</identifier></response>
+200 <?xml version='1.0' encoding='utf-8'?>
+<response kind="list"><item kind="object"><identifier type="int">24001</identifier><created type="int">1792349716</created><ip type="str">127.0.0.1</ip><locale type="str">ru</locale><platform type="str">mac</platform></item></response>
+200 <?xml version='1.0' encoding='utf-8'?>
+<response kind="object"><identifier type="int">24001</identifier><created type="int">1792349716</created><ip type="str">127.0.0.1</ip><locale type="str">ru</locale><platform type="str">mac</platform></response>
+200 <?xml version='1.0' encoding='utf-8'?>
+<response kind="object"><created type="int">1792349716</created><tags type="str" /><stage type="str">queued</stage><triggered type="int">0</triggered><entity type="int">24001</entity><parameter type="str">examples/05-mixed.md</parameter><identifier type="int">24002</identifier></response>
+200 <?xml version='1.0' encoding='utf-8'?>
+<response kind="list" />
+200 <?xml version='1.0' encoding='utf-8'?>
+<response kind="list"><item kind="object"><identifier type="int">1</identifier><created type="int">1792349716</created><output type="str">/Users/slavatalesnikov/Desktop/task2/output/24002-73609873716f43a7b2ee420b0be88481.docx</output><stage type="str">done</stage><exception type="str" /><assignment type="int">24002</assignment><cache_hit type="int">0</cache_hit><duration type="int">74</duration></item></response>
+200 <?xml version='1.0' encoding='utf-8'?>
+<response kind="list"><item kind="object"><identifier type="int">24002</identifier><created type="int">1792349716</created><parameter type="str">examples/05-mixed.md</parameter><entity type="int">24001</entity><tags type="str" /><stage type="str">done</stage><triggered type="int">1792349716</triggered></item></response>
+200 <?xml version='1.0' encoding='utf-8'?>
+<response kind="object"><identifier type="int">24002</identifier><created type="int">1792349716</created><parameter type="str">examples/05-mixed.md</parameter><entity type="int">24001</entity><tags type="str" /><stage type="str">done</stage><triggered type="int">1792349716</triggered></response>
+200 <?xml version='1.0' encoding='utf-8'?>
+<response kind="object"><identifier type="int">1</identifier><created type="int">1792349716</created><output type="str">/Users/slavatalesnikov/Desktop/task2/output/24002-73609873716f43a7b2ee420b0be88481.docx</output><stage type="str">done</stage><exception type="str" /><assignment type="int">24002</assignment><cache_hit type="int">0</cache_hit><duration type="int">74</duration></response>
+200 <?xml version='1.0' encoding='utf-8'?>
+<response kind="list"><item kind="object"><parameter type="str">examples/05-mixed.md</parameter><cache_hit type="int">0</cache_hit><output type="str">/Users/slavatalesnikov/Desktop/task2/output/24002-73609873716f43a7b2ee420b0be88481.docx</output></item></response>
+200 <?xml version='1.0' encoding='utf-8'?>
+<response kind="object"><deleted type="int">1</deleted></response>
+200 <?xml version='1.0' encoding='utf-8'?>
+<response kind="object"><deleted type="int">1</deleted></response>

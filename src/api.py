@@ -9,6 +9,7 @@ from src.config import DEFAULT_CONFIG, load_auth
 from src.model import Model
 from src.routes import answer as xml_response, router
 from src.storage import JsonStorage
+from src.sql_storage import SqlStorage
 from src.worker import Worker
 
 
@@ -45,12 +46,14 @@ def http_error(error):
     return xml_response({'error': error.description}, error.code)
 
 
-def create_app(path='data/variant24.json', test_mode=False,
-               output_dir='output', config_path=DEFAULT_CONFIG):
-    """собирает приложение с файловым хранилищем второго этапа."""
+def create_app(path='data/variant24.sqlite3', test_mode=False,
+               output_dir='output', config_path=DEFAULT_CONFIG,
+               backend='sqlite'):
+    """по умолчанию использует SQLite через ORM третьего этапа."""
     app = Flask(__name__)
     app.config['API_AUTH'] = load_auth(config_path)
-    app.model = Model(JsonStorage(path))
+    storage = {'json': JsonStorage, 'sqlite': SqlStorage}[backend](path)
+    app.model = Model(storage)
     app.worker = Worker(app.model, output_dir, test_mode)
     app.before_request(authorize)
     app.register_error_handler(ValueError, bad_request)

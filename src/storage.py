@@ -3,6 +3,8 @@
 import json
 from pathlib import Path
 
+from src.report import build_report
+
 
 class JsonStorage:
     """хранит три таблицы в одном JSON-файле; запись заменяет файл целиком.
@@ -31,6 +33,10 @@ class JsonStorage:
             encoding='utf-8',
         )
         temporary.replace(self.path)
+
+    def report(self, now):
+        """строит файловую версию отчёта по формуле 24."""
+        return build_report(self.load(), now)
 
     def close(self):
         """у JSON-хранилища нет постоянно открытых файлов."""

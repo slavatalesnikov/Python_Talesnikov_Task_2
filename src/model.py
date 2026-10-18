@@ -2,7 +2,6 @@
 
 from threading import RLock
 
-from src.report import build_report
 from src.schema import DEFAULTS, normalize, timestamp
 
 
@@ -110,7 +109,7 @@ class Model:
     def list_report(self):
         """строит отчёт с LEFT JOIN по формуле 24."""
         with self.lock:
-            return build_report(self.storage.load(), timestamp())
+            return self.storage.report(timestamp())
 
     def start(self, identifier):
         """ставит время запуска и running, если задача ещё существует."""

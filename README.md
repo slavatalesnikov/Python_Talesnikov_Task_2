@@ -3,6 +3,7 @@
 Тема: HTTP API для асинхронного преобразования Markdown в Docx.
 CLI читает файл и выдаёт Docx в stdout. API реализовано на Flask,
 возвращает XML и использует Basic Auth из конфигурационного файла.
+На третьем этапе данные хранятся в SQLite через ORM SQLAlchemy.
 
 ## Подготовка
 
@@ -94,7 +95,12 @@ subprocess, передаёт путь Markdown аргументом и сохр�
   fetch_feedback, list_report. Их назначение соответствует таблице API.
 - Внутренние `_make`, `_list`, `_fetch`, `_discard` обслуживают таблицы;
   start отмечает запуск; complete сохраняет Feedback и итоговый stage.
-- `JsonStorage.load/save/close` читает, сохраняет и закрывает хранилище.
+- `JsonStorage.load/save/report/close` читает, сохраняет, строит отчёт
+  и закрывает файловое хранилище.
+- `SqlStorage` имеет тот же интерфейс и выполняет операции через ORM.
+  Классы Entity, Assignment, Feedback в orm.py отображают таблицы SQLite.
+  Сохранение выполняется транзакцией; report использует ORM-подзапрос
+  с фильтром времени, outerjoin и distinct.
 - `build_report` вычисляет формулу; normalize проверяет поля и типы.
 - `Worker.submit/execute/convert_file/close` ставит задачу в очередь,
   выполняет её, запускает CLI и дожидается завершения.
@@ -106,7 +112,8 @@ subprocess, передаёт путь Markdown аргументом и сохр�
 
 `config.ini` содержит секцию `[auth]`, поля username и password.
 В репозитории указаны учебные реквизиты `student` / `student`.
-Сервер принимает `--config`, `--database`, `--output`, `--port` (8000)
+Сервер принимает `--backend` (`sqlite` по умолчанию или `json`),
+`--config`, `--database`, `--output`, `--port` (8000)
 и `--test-mode`. Клиент демонстрации — `--config` и `--url`.
 Сервер слушает 127.0.0.1. Базы, Docx и служебные файлы исключены из Git.
 
@@ -130,7 +137,7 @@ MBT использует RuleBasedStateMachine и независимую мод�
 ### Этап 2: Flask, XML и Basic Auth
 
 ```sh
-./run.sh -m src.server --database data/variant24.json
+./run.sh -m src.server --backend json --database data/variant24.json
 ```
 
 В другом терминале, также из папки task2:
@@ -147,3 +154,32 @@ MBT использует RuleBasedStateMachine и независимую мод�
 MBT проверяет API и авторизацию, coverage показывает покрытие ветвей.
 Тесты исполнителя проверяют настоящее преобразование и ошибки процесса.
 Для остановки сервера нажать Ctrl+C.
+
+### Этап 3: SQLite через ORM SQLAlchemy
+
+Остановить сервер второго этапа и запустить:
+
+```sh
+./run.sh -m src.server --backend sqlite --database data/variant24.sqlite3
+```
+
+В другом терминале:
+
+```sh
+./run.sh -m src.demo
+./run.sh -m coverage run --branch --source=src -m pytest tests/test_sql_api.py tests/test_report.py tests/test_protocol.py -q
+.venv/bin/coverage report -m --include='src/api.py,src/routes.py'
+./run.sh -m pytest -q
+.venv/bin/pycodestyle src tests
+.venv/bin/radon cc src tests -s
+```
+
+Демонстрация повторяет 11 операций с SQLite. MBT проверяет тот же контракт
+с новым слоем доступа; отчёт вычисляется ORM-запросом с LEFT JOIN.
+Последние команды проверяют весь проект, оформление PEP8 и сложность.
+Результаты проверок сохранены в reports. По умолчанию база —
+`data/variant24.sqlite3`; для JSON — `data/variant24.json`.
+
+Чтобы показать режим без subprocess: остановить сервер, запустить
+`./run.sh -m src.server --test-mode`, затем в другом терминале
+`./run.sh -m src.demo`. В Feedback будет test.docx без создания файла.

@@ -23,24 +23,27 @@ def seed_report(model, age, parameter):
             'created': NOW - 1000, 'parameter': value, 'entity': 1,
         })
     tables = model.storage.load()
-    for identifier, assignment, created in [
-        (1, 1, NOW - age), (2, 1, NOW - age), (3, 3, NOW - WINDOW_SECONDS),
+    for identifier, assignment, created, hit, output in [
+        (1, 1, NOW - age, 0, 'a.docx'), (2, 1, NOW - age, 0, 'a.docx'),
+        (3, 3, NOW - WINDOW_SECONDS, 0, 'old.docx'),
+        (4, 1, NOW - age, 1, 'b.docx'),
     ]:
         tables['feedback'].append({
             'identifier': identifier, 'assignment': assignment,
-            'created': created, 'cache_hit': 0, 'output': 'a.docx',
+            'created': created, 'cache_hit': hit, 'output': output,
             'stage': 'done', 'exception': '', 'duration': 0,
         })
     model.storage.save(tables)
 
 
 @given(age=st.sampled_from([-10, 299, 300, 301]),
-       parameter=st.text(alphabet='абв ab<&>', max_size=20))
+       parameter=st.text(alphabet='абв ab<&>', max_size=20),
+       backend=st.sampled_from(['json', 'sqlite']))
 @settings(max_examples=16, deadline=None)
-def test_report_formula(age, parameter):
+def test_report_formula(age, parameter, backend):
     """проверяет фильтрацию правого отношения до левого соединения."""
     with TemporaryDirectory() as directory:
-        app = create_app(f'{directory}/db.json', True)
+        app = create_app(f'{directory}/db', True, backend=backend)
         seed_report(app.model, age, parameter)
         client = ApiClient(transport=app.test_client())
         with patch('src.model.timestamp', return_value=NOW):
@@ -50,6 +53,7 @@ def test_report_formula(age, parameter):
         if age < WINDOW_SECONDS:
             expected.remove((parameter, None, None))
             expected.add((parameter, 0, 'a.docx'))
+            expected.add((parameter, 1, 'b.docx'))
         assert response.status_code == OK
         assert loads(response.content) == [
             {'parameter': value, 'cache_hit': hit, 'output': output}
