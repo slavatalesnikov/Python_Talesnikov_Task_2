@@ -1,9 +1,8 @@
-"""тестирование MBT: независимая модель в словарях сравнивается с HTTP API."""
+"""тестирование MBT API варианта 24: независимая модель, XML и Basic Auth."""
 
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from fastapi.testclient import TestClient
 from hypothesis import settings, strategies as st
 from hypothesis.stateful import (
     RuleBasedStateMachine, initialize, invariant, rule,
@@ -11,202 +10,217 @@ from hypothesis.stateful import (
 
 from src.api import create_app
 from src.client import ApiClient
+from src.xml_format import loads
 
 
 NOW = 2_000_000_000
 OK = 200
 BAD_REQUEST = 400
-UNSUPPORTED_MEDIA = 415
-NOT_ACCEPTABLE = 406
-METHOD_NOT_ALLOWED = 405
-WINDOW_SECONDS = 6 * 60
-UIDS = st.integers(min_value=1, max_value=5)
-TEXT = st.text(alphabet='абв abc012#*_\n', max_size=30)
-OFFSETS = st.sampled_from([0, 359, 360, 361, 900, -60])
-
-
-def header_status(method, content, accept):
-    """определяет ожидаемый статус по таблице заголовков задания."""
-    if method in ('PUT', 'POST', 'PATCH') and content != 'application/json':
-        return UNSUPPORTED_MEDIA
-    if accept != 'application/json':
-        return NOT_ACCEPTABLE
-    return OK if method == 'GET' else METHOD_NOT_ALLOWED
+UNAUTHORIZED = 401
+NOT_FOUND = 404
+IDENTIFIERS = st.integers(min_value=1, max_value=4)
+TEXT = st.text(alphabet='абв abc012<&>', max_size=20)
+ROUTES = [
+    ('PUT', 'make-entity/1'), ('POST', 'discard-entity'),
+    ('POST', 'list-entity'), ('GET', 'fetch-entity'),
+    ('PUT', 'make-assignment/1'), ('POST', 'discard-assignment'),
+    ('POST', 'list-assignment/1'), ('GET', 'fetch-assignment'),
+    ('POST', 'list-feedback/1'), ('GET', 'fetch-feedback'),
+    ('POST', 'list-report'),
+]
 
 
 class ApiMachine(RuleBasedStateMachine):
-    """генерирует последовательности создания, изменения, поиска и удаления.
-
-    ожидаемые данные не вычисляются функциями приложения: словари
-    описывают состояние, которое должно наблюдаться через HTTP-клиент.
-    """
+    """сравнивает данные через клиент с отдельными словарями Python."""
 
     backend = 'json'
 
     def __init__(self):
-        """создаёт отдельную базу и фиксирует время для границы отчёта."""
+        """создаёт отдельную базу для каждого сгенерированного сценария."""
         super().__init__()
         self.directory = TemporaryDirectory()
         self.clock = patch('src.model.timestamp', return_value=NOW)
         self.clock.start()
         self.app = self.make_app()
-        self.client = ApiClient(transport=TestClient(self.app))
-        self.actors = {}
-        self.instructions = {}
-        self.responses = {}
+        self.client = ApiClient(transport=self.app.test_client())
+        self.entities = {}
+        self.assignments = {}
+        self.feedback = {}
 
     def make_app(self):
-        """создаёт приложение с JSON-хранилищем второго этапа."""
-        return create_app(f'{self.directory.name}/database.json', True,
-                          backend=self.backend)
+        """использует файловое JSON-хранилище второго этапа."""
+        return create_app(f'{self.directory.name}/db.json', True)
 
     def data(self, response):
-        """проверяет успешный статус и JSON каждого штатного запроса."""
+        """требует 200 OK и XML для каждого штатного запроса."""
         assert response.status_code == OK, response.text
-        assert response.headers['content-type'] == 'application/json'
-        return response.json()
+        assert response.headers['content-type'].startswith('application/xml')
+        return loads(response.content)
 
     @initialize(text=TEXT)
     def start(self, text):
-        """гарантирует посещение всех десяти маршрутов в каждом сценарии."""
-        self.actor_upsert(1, text)
-        self.actor_upsert(1, text + 'x')
-        self.instruction_upsert(1, 1, text, 360)
-        self.instruction_upsert(1, 1, text + 'y', 361)
+        """гарантирует выполнение всех одиннадцати обработчиков."""
+        self.create_entity(1, text)
+        self.create_assignment(1, 1, text)
         self.observe()
-        self.remove_instruction(1)
-        self.remove_actor(1)
-        self.headers('PUT', None, None)
-        self.headers('GET', None, None)
-        self.headers('GET', None, 'application/json')
+        self.filters(1, text)
+        self.remove_assignment(1)
+        self.remove_entity(1)
+        self.unauthorized('')
+        self.protocol_errors()
 
-    @rule(uid=UIDS, text=TEXT)
-    def actor_upsert(self, uid, text):
-        """создаёт участника или обновляет существующую запись."""
-        if uid in self.actors:
-            result = self.data(self.client.post_actor_revise(
-                uid, platform=text,
-            ))
-            self.actors[uid]['platform'] = text
+    @rule(identifier=IDENTIFIERS, text=TEXT)
+    def create_entity(self, identifier, text):
+        """создаёт Entity либо проверяет отказ при повторении ключа."""
+        fields = {'created': NOW, 'ip': '127.0.0.1',
+                  'locale': 'ru', 'platform': text}
+        response = self.client.make_entity(identifier, fields)
+        if identifier in self.entities:
+            assert response.status_code == BAD_REQUEST
         else:
-            fields = {'datetime': NOW, 'platform': text, 'user_agent': 'mbt'}
-            result = self.data(self.client.put_actor_submit(uid, **fields))
-            self.actors[uid] = fields | {'uid': uid}
-        assert result == self.actors[uid]
+            self.entities[identifier] = fields | {'identifier': identifier}
+            assert self.data(response) == self.entities[identifier]
 
-    @rule(uid=UIDS, actor=UIDS, text=TEXT, offset=OFFSETS)
-    def instruction_upsert(self, uid, actor, text, offset):
-        """сравнивает поля задач, а после создания ожидает тестовый ответ."""
-        if actor not in self.actors:
-            self.actor_upsert(actor, text)
-        fields = {'datetime': NOW - offset, 'actor': actor, 'input': text,
-                  'description': text, 'tags': 'mbt', 'stage': 'queued'}
-        if uid in self.instructions:
-            fields['stage'] = 'done'
-            result = self.data(self.client.post_instruction_revise(
-                uid, **fields,
-            ))
-        else:
-            result = self.data(self.client.put_instruction_submit(
-                uid, **fields,
-            ))
-            response_uid = max(self.responses, default=0) + 1
-            self.responses[response_uid] = {
-                'uid': response_uid, 'datetime': NOW, 'output': 'test.docx',
-                'stage': 'done', 'failure': '', 'instruction': uid,
-            }
-        assert result == fields | {'uid': uid}
-        self.instructions[uid] = fields | {'uid': uid, 'stage': 'done'}
+    @rule(identifier=IDENTIFIERS, entity=IDENTIFIERS, text=TEXT)
+    def create_assignment(self, identifier, entity, text):
+        """проверяет создание задачи и автоматического тестового Feedback."""
+        if entity not in self.entities:
+            self.create_entity(entity, text)
+        fields = {'created': NOW, 'entity': entity, 'parameter': text,
+                  'tags': 'mbt', 'stage': 'queued', 'triggered': 0}
+        response = self.client.make_assignment(identifier, fields)
+        if identifier in self.assignments:
+            assert response.status_code == BAD_REQUEST
+            return
+        assert self.data(response) == fields | {'identifier': identifier}
+        self.assignments[identifier] = fields | {
+            'identifier': identifier, 'stage': 'done', 'triggered': NOW,
+        }
+        key = max(self.feedback, default=0) + 1
+        self.feedback[key] = {
+            'identifier': key, 'created': NOW, 'output': 'test.docx',
+            'stage': 'done', 'exception': '', 'assignment': identifier,
+            'cache_hit': 0, 'duration': 0,
+        }
 
-    @rule(uid=UIDS)
-    def remove_instruction(self, uid):
-        """удаляет задачу, включая её результаты в эталонной модели."""
-        result = self.data(self.client.delete_instruction_pop(uid))
-        assert result == {'deleted': uid in self.instructions}
-        self.instructions.pop(uid, None)
-        self.responses = {key: row for key, row in self.responses.items()
-                          if row['instruction'] != uid}
+    @rule(identifier=IDENTIFIERS)
+    def remove_assignment(self, identifier):
+        """сравнивает удаление задачи и каскада результатов."""
+        response = self.client.discard_assignment({'identifier': identifier})
+        assert self.data(response) == {
+            'deleted': int(identifier in self.assignments),
+        }
+        self.assignments.pop(identifier, None)
+        self.feedback = {key: row for key, row in self.feedback.items()
+                         if row['assignment'] != identifier}
 
-    @rule(uid=UIDS)
-    def remove_actor(self, uid):
-        """проверяет каскадное удаление участника и его задач."""
-        result = self.data(self.client.delete_actor_pop(uid))
-        assert result == {'deleted': uid in self.actors}
-        self.actors.pop(uid, None)
-        self.instructions = {key: row for key, row in self.instructions.items()
-                             if row['actor'] != uid}
-        self.responses = {key: row for key, row in self.responses.items()
-                          if row['instruction'] in self.instructions}
+    @rule(identifier=IDENTIFIERS)
+    def remove_entity(self, identifier):
+        """сравнивает удаление Entity и её дочерних данных."""
+        response = self.client.discard_entity({'identifier': identifier})
+        assert self.data(response) == {
+            'deleted': int(identifier in self.entities),
+        }
+        self.entities.pop(identifier, None)
+        self.assignments = {key: row for key, row in self.assignments.items()
+                            if row['entity'] != identifier}
+        self.feedback = {key: row for key, row in self.feedback.items()
+                         if row['assignment'] in self.assignments}
 
-    @rule(uid=UIDS, text=TEXT)
-    def filters(self, uid, text):
-        """проверяет совпадающие и несовпадающие фильтры поиска."""
-        result = self.data(self.client.get_actor_show(uid=uid))
-        assert result == [row for row in self.actors.values()
-                          if row['uid'] == uid]
-        result = self.data(self.client.get_instruction_show(
-            uid, description=text,
-        ))
-        assert result == [row for row in self.instructions.values()
-                          if row['actor'] == uid
-                          and row['description'] == text]
-        result = self.data(self.client.get_response_show(uid, stage='failed'))
-        assert result == []
-
-    @rule(method=st.sampled_from(['GET', 'PUT', 'POST', 'PATCH', 'DELETE']),
-          content=st.sampled_from([None, 'text/plain', 'application/json']),
-          accept=st.sampled_from([None, '*/*', 'application/json']))
-    def headers(self, method, content, accept):
-        """проверяет приоритет 415 над 406, включая отсутствие обоих полей."""
-        original = dict(self.client.http.headers)
-        self.client.http.headers.clear()
-        headers = {}
-        if content is not None:
-            headers['Content-Type'] = content
-        if accept is not None:
-            headers['Accept'] = accept
-        response = self.client.request(method, '/show/actor', headers=headers)
-        self.client.http.headers.update(original)
-        assert response.status_code == header_status(method, content, accept)
-
-    @rule(uid=UIDS)
-    def invalid_changes(self, uid):
-        """отсутствующая запись и неизвестное поле дают JSON с ошибкой."""
-        response = self.client.post_actor_revise(uid, unknown='x')
-        assert response.status_code == BAD_REQUEST
-        assert 'error' in response.json()
-        response = self.client.put_instruction_submit(
-            999, actor=999, input='нет участника',
+    def read_records(self, identifier):
+        """проверяет чтение существующих и отсутствующих первичных ключей."""
+        assert self.data(self.client.fetch_entity(identifier)) == (
+            self.entities.get(identifier)
         )
+        assert self.data(self.client.fetch_assignment(identifier)) == (
+            self.assignments.get(identifier)
+        )
+        assert self.data(self.client.fetch_feedback(identifier)) == (
+            self.feedback.get(identifier)
+        )
+
+    @rule(identifier=IDENTIFIERS, text=TEXT)
+    def filters(self, identifier, text):
+        """проверяет дополнительные фильтры поиска и чтение по ключам."""
+        self.read_records(identifier)
+        rows = self.data(self.client.list_entity({'platform': text}))
+        expected = [row for row in self.entities.values()
+                    if row['platform'] == text]
+        assert rows == sorted(expected, key=lambda row: row['identifier'])
+        rows = self.data(self.client.list_assignment(
+            identifier, {'tags': text},
+        ))
+        expected = [row for row in self.assignments.values()
+                    if row['entity'] == identifier and row['tags'] == text]
+        assert rows == sorted(expected, key=lambda row: row['identifier'])
+        assert self.data(self.client.list_feedback(
+            identifier, {'stage': 'failed'},
+        )) == []
+
+    @rule(header=st.sampled_from(['', 'Basic !!!', 'Bearer abc',
+                                 'Basic c3R1ZGVudDp3cm9uZw==']))
+    def unauthorized(self, header):
+        """проверяет 401 и WWW-Authenticate на каждом маршруте таблицы 24."""
+        for method, path in ROUTES:
+            response = self.client.request(
+                method, path, headers={'Authorization': header},
+            )
+            assert response.status_code == UNAUTHORIZED
+            assert 'Basic realm=' in response.headers['www-authenticate']
+            assert 'error' in loads(response.content)
+
+    @rule(identifier=IDENTIFIERS)
+    def invalid_fields(self, identifier):
+        """проверяет неизвестные поля и отсутствующую родительскую запись."""
+        response = self.client.make_entity(identifier, {'unknown': 'x'})
+        assert response.status_code == BAD_REQUEST
+        response = self.client.make_assignment(
+            999, {'entity': 999, 'parameter': 'x.md'},
+        )
+        assert response.status_code == BAD_REQUEST
+        response = self.client.fetch_entity('invalid')
+        assert response.status_code == BAD_REQUEST
+
+    @rule()
+    def protocol_errors(self):
+        """проверяет ошибки XML, неизвестный маршрут и неверный метод."""
+        response = self.client.request('GET', 'missing')
+        assert response.status_code == NOT_FOUND
+        assert 'error' in loads(response.content)
+        response = self.client.request('POST', 'list-entity', {'x': {'y': 1}})
         assert response.status_code == BAD_REQUEST
 
     @invariant()
     def observe(self):
-        """после каждого действия сверяет все таблицы и отчёт через API."""
-        actors = self.data(self.client.get_actor_show())
-        assert sorted(actors, key=lambda row: row['uid']) == [
-            self.actors[key] for key in sorted(self.actors)
+        """сверяет все записи и отчёт после каждого действия модели."""
+        entities = self.data(self.client.list_entity({}))
+        expected = [self.entities[key] for key in sorted(self.entities)]
+        assert entities == expected
+        for identifier in range(1, 5):
+            rows = self.data(self.client.list_assignment(identifier, {}))
+            expected = [row for row in self.assignments.values()
+                        if row['entity'] == identifier]
+            assert rows == sorted(expected, key=lambda row: row['identifier'])
+            rows = self.data(self.client.list_feedback(identifier, {}))
+            expected = [row for row in self.feedback.values()
+                        if row['assignment'] == identifier]
+            assert rows == sorted(expected, key=lambda row: row['identifier'])
+        self.check_report()
+
+    def check_report(self):
+        """сравнивает независимую проекцию тестовых ответов с отчётом."""
+        expected = {(row['parameter'], 0, 'test.docx')
+                    for row in self.assignments.values()}
+        assert self.data(self.client.list_report()) == [
+            {'parameter': parameter, 'cache_hit': hit, 'output': output}
+            for parameter, hit, output in sorted(expected, key=repr)
         ]
-        for uid in range(1, 6):
-            instructions = self.data(self.client.get_instruction_show(uid))
-            assert instructions == [row for row in self.instructions.values()
-                                    if row['actor'] == uid]
-            responses = self.data(self.client.get_response_show(uid))
-            assert responses == [row for row in self.responses.values()
-                                 if row['instruction'] == uid]
-        expected = set()
-        for response in self.responses.values():
-            instruction = self.instructions[response['instruction']]
-            if instruction['datetime'] >= NOW - WINDOW_SECONDS:
-                expected.add((instruction['description'], response['output']))
-        report = self.data(self.client.get_report_show())
-        assert report == [{'description': description, 'output': output}
-                          for description, output in sorted(expected)]
 
     def teardown(self):
-        """закрывает транспорт и удаляет временные данные сценария."""
+        """освобождает транспорт, исполнитель, базу и временный каталог."""
         self.client.close()
-        self.app.state.model.storage.close()
+        self.app.worker.close()
+        self.app.model.storage.close()
         self.clock.stop()
         self.directory.cleanup()
 

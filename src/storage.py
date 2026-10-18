@@ -16,7 +16,7 @@ class JsonStorage:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         if not self.path.exists():
-            names = ('actor', 'instruction', 'response')
+            names = ('entity', 'assignment', 'feedback')
             self.save({name: [] for name in names})
 
     def load(self):

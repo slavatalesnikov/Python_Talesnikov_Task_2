@@ -1,61 +1,60 @@
-"""настройка FastAPI, хранения и обязательных заголовков варианта 22."""
+"""приложение Flask с XML и Basic Auth по RFC 7617 для варианта 24."""
 
-from contextlib import asynccontextmanager
+from hmac import compare_digest
 
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from flask import Flask, current_app, request
+from werkzeug.exceptions import HTTPException
 
+from src.config import DEFAULT_CONFIG, load_auth
 from src.model import Model
-from src.routes import router
+from src.routes import answer as xml_response, router
 from src.storage import JsonStorage
-from src.tiny_storage import TinyStorage
 from src.worker import Worker
 
 
-JSON_TYPE = 'application/json'
-BODY_METHODS = {'POST', 'PUT', 'PATCH'}
-UNSUPPORTED_MEDIA = 415
-NOT_ACCEPTABLE = 406
+UNAUTHORIZED = 401
 BAD_REQUEST = 400
 
 
-async def check_headers(request: Request, call_next):
-    """проверяет заголовки в порядке таблицы: Content-Type, затем Accept.
-
-    значения также проверяются. для Content-Type допускается charset,
-    для Accept — список типов, содержащий application/json.
-    """
-    content_type = request.headers.get('content-type', '').split(';')[0]
-    if request.method in BODY_METHODS and content_type.lower() != JSON_TYPE:
-        return JSONResponse({'error': 'нужен Content-Type: application/json'},
-                            status_code=UNSUPPORTED_MEDIA)
-    accepts = request.headers.get('accept', '').lower().split(',')
-    if JSON_TYPE not in [value.strip() for value in accepts]:
-        return JSONResponse({'error': 'нужен Accept: application/json'},
-                            status_code=NOT_ACCEPTABLE)
-    return await call_next(request)
-
-
-async def bad_request(request: Request, error: Exception):
-    """возвращает ошибки модели в JSON вместо внутренней ошибки сервера."""
-    return JSONResponse({'error': str(error)}, status_code=BAD_REQUEST)
+def authorize():
+    """проверяет Basic Auth до чтения тела и вызова любого обработчика."""
+    auth = request.authorization
+    username, password = current_app.config['API_AUTH']
+    valid = auth is not None and auth.type == 'basic'
+    if valid:
+        valid = (compare_digest((auth.username or '').encode(),
+                                username.encode())
+                 and compare_digest((auth.password or '').encode(),
+                                    password.encode()))
+    if not valid:
+        response = xml_response({'error': 'нужна авторизация'}, UNAUTHORIZED)
+        response.headers['WWW-Authenticate'] = (
+            'Basic realm="task2", charset="UTF-8"'
+        )
+        return response
+    return None
 
 
-def create_app(path='data/database.json', test_mode=False,
-               output_dir='output', backend='tinydb'):
-    """создаёт приложение; по умолчанию используется TinyDB третьего этапа."""
-    @asynccontextmanager
-    async def lifespan(app):
-        """закрывает хранилище после остановки сервера."""
-        yield
-        app.state.model.storage.close()
+def bad_request(error):
+    """возвращает ошибки полей, ключей и XML в теле ответа."""
+    return xml_response({'error': str(error)}, BAD_REQUEST)
 
-    app = FastAPI(title='Markdown -> Docx, вариант 22', lifespan=lifespan)
-    storage_class = {'json': JsonStorage, 'tinydb': TinyStorage}[backend]
-    app.state.model = Model(storage_class(path))
-    app.state.worker = Worker(app.state.model, output_dir, test_mode)
-    app.middleware('http')(check_headers)
-    app.add_exception_handler(ValueError, bad_request)
-    app.add_exception_handler(KeyError, bad_request)
-    app.include_router(router)
+
+def http_error(error):
+    """сохраняет XML также для неизвестного маршрута или метода."""
+    return xml_response({'error': error.description}, error.code)
+
+
+def create_app(path='data/variant24.json', test_mode=False,
+               output_dir='output', config_path=DEFAULT_CONFIG):
+    """собирает приложение с файловым хранилищем второго этапа."""
+    app = Flask(__name__)
+    app.config['API_AUTH'] = load_auth(config_path)
+    app.model = Model(JsonStorage(path))
+    app.worker = Worker(app.model, output_dir, test_mode)
+    app.before_request(authorize)
+    app.register_error_handler(ValueError, bad_request)
+    app.register_error_handler(KeyError, bad_request)
+    app.register_error_handler(HTTPException, http_error)
+    app.register_blueprint(router)
     return app

@@ -1,61 +1,68 @@
-"""проверки реального преобразования и сохранения ошибок исполнителя."""
+"""сгенерированные проверки subprocess и настоящего Docx."""
 
-import subprocess
 from pathlib import Path
+import subprocess
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from docx import Document
-from fastapi.testclient import TestClient
 from hypothesis import given, settings, strategies as st
 
 from src.api import create_app
 from src.client import ApiClient
+from src.xml_format import loads
 
 
 OK = 200
 
 
-def submit_document(app, text):
-    """создаёт участника и задачу через тот же HTTP-клиент."""
-    with TestClient(app) as transport:
-        client = ApiClient(transport=transport)
-        assert client.put_actor_submit(1).status_code == OK
-        response = client.put_instruction_submit(1, actor=1, input=text)
-        assert response.status_code == OK
-        return client.get_response_show(1).json()[0]
+def submit_document(app, path):
+    """передаёт путь Markdown через XML API и ждёт фонового исполнителя."""
+    client = ApiClient(transport=app.test_client())
+    assert client.make_entity(1, {}).status_code == OK
+    response = client.make_assignment(1, {'entity': 1, 'parameter': str(path)})
+    assert response.status_code == OK
+    app.worker.close()
+    result = loads(client.list_feedback(1, {}).content)[0]
+    client.close()
+    return result
 
 
 @given(text=st.text(alphabet='абв abc012', min_size=1, max_size=30))
 @settings(max_examples=5, deadline=None)
 def test_real_conversion(text):
-    """действительно запускает CLI и открывает полученный docx."""
+    """читает созданный из бинарного stdout документ через python-docx."""
     with TemporaryDirectory() as directory:
+        source = Path(directory) / 'input.md'
+        source.write_text('# Заголовок\n\n' + text, encoding='utf-8')
         app = create_app(f'{directory}/db.json', False, f'{directory}/output')
-        result = submit_document(app, '# Заголовок\n\n' + text)
+        result = submit_document(app, source)
         assert result['stage'] == 'done'
-        assert result['failure'] == ''
-        output = Path(result['output'])
-        assert output.is_file()
-        paragraphs = Document(output).paragraphs
+        assert result['exception'] == ''
+        assert result['cache_hit'] == 0
+        assert result['duration'] >= 0
+        paragraphs = Document(result['output']).paragraphs
         assert paragraphs[0].text == 'Заголовок'
         assert paragraphs[0].style.name == 'Heading 1'
         assert paragraphs[1].text == text.strip()
+        app.model.storage.close()
 
 
-@given(mode=st.sampled_from(['exit', 'timeout', 'oserror']))
+@given(mode=st.sampled_from(['missing', 'timeout', 'oserror']))
 @settings(max_examples=3, deadline=None)
 def test_conversion_failure(mode):
-    """проверяет ненулевой код процесса, таймаут и ошибку запуска."""
+    """проверяет отсутствующий файл, таймаут и ошибку запуска процесса."""
     with TemporaryDirectory() as directory:
-        app = create_app(f'{directory}/db.json')
-        error = {'exit': None,
-                 'timeout': subprocess.TimeoutExpired('converter', 60),
-                 'oserror': OSError('процесс не запущен')}[mode]
-        result = subprocess.CompletedProcess([], 1, '', 'ошибка CLI')
-        with patch('src.worker.subprocess.run', return_value=result,
-                   side_effect=error):
-            response = submit_document(app, '# Пример')
-        assert response['stage'] == 'failed'
-        assert response['output'] == ''
-        assert response['failure']
+        app = create_app(f'{directory}/db.json', False, f'{directory}/output')
+        errors = {'timeout': subprocess.TimeoutExpired('converter', 60),
+                  'oserror': OSError('процесс не запущен')}
+        if mode == 'missing':
+            result = submit_document(app, f'{directory}/missing.md')
+        else:
+            with patch('src.worker.subprocess.run', side_effect=errors[mode]):
+                result = submit_document(app, 'example.md')
+        assert result['stage'] == 'failed'
+        assert result['output'] == ''
+        assert result['exception']
+        assert not list(Path(directory).rglob('*.docx'))
+        app.model.storage.close()

@@ -1,0 +1,12 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.13.5, pytest-9.1.1, pluggy-1.7.0 -- /Users/slavatalesnikov/Desktop/task2/.venv/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /Users/slavatalesnikov/Desktop/task2
+plugins: hypothesis-6.170.0, anyio-4.15.1
+collecting ... collected 2 items
+
+tests/test_worker.py::test_real_conversion PASSED                        [ 50%]
+tests/test_worker.py::test_conversion_failure PASSED                     [100%]
+
+============================== 2 passed in 0.82s ===============================

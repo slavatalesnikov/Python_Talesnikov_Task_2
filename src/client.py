@@ -1,70 +1,90 @@
-"""клиент HTTP с именами методов вида метод_таблица_действие."""
+"""клиент XML API; имена методов совпадают с публичными методами модели."""
+
+from base64 import b64encode
 
 import httpx
 
-
-PREFIX = '/private/api/v2'
+from src.config import DEFAULT_CONFIG, load_auth
+from src.xml_format import dumps
 
 
 class ApiClient:
-    """работает с настоящим HTTP-сервером или тестовым транспортом."""
+    """использует настоящий HTTP либо тестовый транспорт Flask."""
 
-    def __init__(self, base_url='http://127.0.0.1:8000', transport=None):
-        """переданный TestClient позволяет запускать те же методы в MBT."""
-        self.http = transport if transport is not None else httpx.Client(
-            base_url=base_url, timeout=30,
-        )
-        self.http.headers.update({'Accept': 'application/json',
-                                  'Content-Type': 'application/json'})
+    def __init__(self, base_url='http://127.0.0.1:8000', transport=None,
+                 config_path=DEFAULT_CONFIG):
+        """читает Basic Auth из того же конфигурационного файла."""
+        self.username, self.password = load_auth(config_path)
+        self.transport = transport
+        self.http = httpx.Client(base_url=base_url, timeout=30)
 
-    def request(self, method, path, **kwargs):
-        """возвращает HTTP-ответ, позволяя проверять и статус, и JSON."""
-        return self.http.request(method, PREFIX + path, **kwargs)
+    def request(self, method, path, fields=None, query=None, headers=None,
+                raw=None):
+        """отправляет XML с Basic Auth, возвращая обычный HTTP-ответ."""
+        credentials = f'{self.username}:{self.password}'.encode('utf-8')
+        token = b64encode(credentials).decode('ascii')
+        values = {'Authorization': f'Basic {token}',
+                  'Content-Type': 'application/xml'}
+        values.update(headers or {})
+        data = b'' if fields is None else dumps(fields, 'request')
+        if raw is not None:
+            data = raw
+        path = '/api/' + path
+        if self.transport is not None:
+            result = self.transport.open(path, method=method, data=data,
+                                         query_string=query, headers=values)
+            return httpx.Response(result.status_code, content=result.data,
+                                  headers=dict(result.headers))
+        return self.http.request(method, path, content=data,
+                                 params=query, headers=values)
 
-    def put_actor_submit(self, uid, **fields):
-        """создаёт Actor, передавая его поля в строке запроса."""
-        return self.request('PUT', f'/submit/actor/{uid}', params=fields)
+    def make_entity(self, identifier, fields):
+        """создаёт Entity по ключу в пути и XML-телу."""
+        return self.request('PUT', f'make-entity/{identifier}', fields)
 
-    def delete_actor_pop(self, uid):
-        """удаляет Actor по ключу из пути."""
-        return self.request('DELETE', f'/pop/actor/{uid}')
+    def discard_entity(self, fields):
+        """удаляет Entity по identifier из тела."""
+        return self.request('POST', 'discard-entity', fields)
 
-    def get_actor_show(self, **filters):
-        """ищет участников по точному совпадению полей."""
-        return self.request('GET', '/show/actor', params=filters)
+    def list_entity(self, fields):
+        """ищет Entity по XML-фильтру."""
+        return self.request('POST', 'list-entity', fields)
 
-    def post_actor_revise(self, uid, **changes):
-        """отправляет uid и изменяемые поля в JSON."""
-        return self.request('POST', '/revise/actor',
-                            json=changes | {'uid': uid})
+    def fetch_entity(self, identifier):
+        """читает Entity по ключу в строке запроса."""
+        return self.request('GET', 'fetch-entity',
+                            query={'identifier': identifier})
 
-    def put_instruction_submit(self, uid, **fields):
-        """передаёт Markdown и параметры новой задачи в строке запроса."""
-        return self.request('PUT', f'/submit/instruction/{uid}', params=fields)
+    def make_assignment(self, identifier, fields):
+        """создаёт задачу преобразования Markdown-файла."""
+        return self.request('PUT', f'make-assignment/{identifier}', fields)
 
-    def delete_instruction_pop(self, uid):
-        """удаляет Instruction по ключу из пути."""
-        return self.request('DELETE', f'/pop/instruction/{uid}')
+    def discard_assignment(self, fields):
+        """удаляет Assignment по XML-телу."""
+        return self.request('POST', 'discard-assignment', fields)
 
-    def get_instruction_show(self, actor, **filters):
-        """ищет задачи выбранного участника."""
-        return self.request('GET', f'/show/instruction/{actor}',
-                            params=filters)
+    def list_assignment(self, entity, fields):
+        """ищет Assignment для участника, указанного в пути."""
+        return self.request('POST', f'list-assignment/{entity}', fields)
 
-    def post_instruction_revise(self, uid, **changes):
-        """изменяет Instruction через JSON-тело."""
-        return self.request('POST', '/revise/instruction',
-                            json=changes | {'uid': uid})
+    def fetch_assignment(self, identifier):
+        """читает Assignment по первичному ключу."""
+        return self.request('GET', 'fetch-assignment',
+                            query={'identifier': identifier})
 
-    def get_response_show(self, instruction, **filters):
-        """ищет результаты выбранной задачи."""
-        return self.request('GET', f'/show/response/{instruction}',
-                            params=filters)
+    def list_feedback(self, assignment, fields):
+        """ищет Feedback задачи по XML-фильтру."""
+        return self.request('POST', f'list-feedback/{assignment}', fields)
 
-    def get_report_show(self):
-        """получает отчёт за последние шесть минут."""
-        return self.request('GET', '/show/report')
+    def fetch_feedback(self, identifier):
+        """читает Feedback по первичному ключу."""
+        return self.request('GET', 'fetch-feedback',
+                            query={'identifier': identifier})
+
+    def list_report(self):
+        """запрашивает отчёт без тела запроса."""
+        return self.request('POST', 'list-report')
 
     def close(self):
-        """освобождает соединения HTTP-клиента."""
+        """закрывает сетевые соединения клиента."""
         self.http.close()

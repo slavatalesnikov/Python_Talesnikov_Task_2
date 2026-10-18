@@ -1,26 +1,23 @@
-"""сгенерированные проверки сохранения данных после повторного открытия."""
+"""сгенерированные проверки сохранения базы на диске."""
 
 from tempfile import TemporaryDirectory
 
 from hypothesis import given, settings, strategies as st
 
+from src.model import Model
 from src.storage import JsonStorage
-from src.tiny_storage import TinyStorage
 
 
-@given(text=st.text(max_size=40), backend=st.sampled_from(['json', 'tinydb']))
+@given(text=st.text(max_size=40))
 @settings(max_examples=10, deadline=None)
-def test_reopen_storage(text, backend):
-    """закрывает базу и проверяет те же документы после нового открытия."""
-    storage_class = {'json': JsonStorage, 'tinydb': TinyStorage}[backend]
+def test_reopen_storage(text):
+    """после закрытия и открытия базы видны те же записи."""
     with TemporaryDirectory() as directory:
         path = f'{directory}/db.json'
-        storage = storage_class(path)
-        tables = {'actor': [{'uid': 1, 'datetime': 1,
-                             'platform': text, 'user_agent': 'test'}],
-                  'instruction': [], 'response': []}
-        storage.save(tables)
+        storage = JsonStorage(path)
+        model = Model(storage)
+        expected = model.make_entity(1, {'platform': text})
         storage.close()
-        storage = storage_class(path)
-        assert storage.load() == tables
+        storage = JsonStorage(path)
+        assert Model(storage).fetch_entity(1) == expected
         storage.close()

@@ -1,53 +1,60 @@
-"""сгенерированные проверки inner join, проекции и границы времени."""
+"""проверки LEFT JOIN и строгой границы пяти минут для Feedback."""
 
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from fastapi.testclient import TestClient
 from hypothesis import given, settings, strategies as st
 
 from src.api import create_app
 from src.client import ApiClient
+from src.xml_format import loads
 
 
 NOW = 2_000_000_000
-WINDOW_SECONDS = 6 * 60
+WINDOW_SECONDS = 5 * 60
 OK = 200
 
 
-def seed_report(model, age, description):
-    """задаёт две инструкции: у второй намеренно нет результата.
+def seed_report(model, age, parameter):
+    """создаёт старую задачу со свежим ответом, пустую и со старым ответом."""
+    model.make_entity(1, {})
+    for identifier, value in [(1, parameter), (2, 'empty'), (3, 'old')]:
+        model.make_assignment(identifier, {
+            'created': NOW - 1000, 'parameter': value, 'entity': 1,
+        })
+    tables = model.storage.load()
+    for identifier, assignment, created in [
+        (1, 1, NOW - age), (2, 1, NOW - age), (3, 3, NOW - WINDOW_SECONDS),
+    ]:
+        tables['feedback'].append({
+            'identifier': identifier, 'assignment': assignment,
+            'created': created, 'cache_hit': 0, 'output': 'a.docx',
+            'stage': 'done', 'exception': '', 'duration': 0,
+        })
+    model.storage.save(tables)
 
-    две одинаковые строки результата проверяют устранение дубликатов
-    проекции. лишний результат без пары проверяет именно inner join.
-    """
-    model.storage.save({
-        'actor': [],
-        'instruction': [
-            {'uid': 1, 'datetime': NOW - age, 'description': description},
-            {'uid': 2, 'datetime': NOW, 'description': 'без результата'},
-        ],
-        'response': [
-            {'uid': 1, 'instruction': 1, 'output': 'a.docx'},
-            {'uid': 2, 'instruction': 1, 'output': 'a.docx'},
-            {'uid': 3, 'instruction': 999, 'output': 'без инструкции'},
-        ],
-    })
 
-
-@given(age=st.sampled_from([359, 360, 361]), description=st.text(max_size=30))
-@settings(max_examples=12, deadline=None)
-def test_report_formula(age, description):
-    """запрашивает отчёт через API с заранее подготовленными таблицами."""
+@given(age=st.sampled_from([-10, 299, 300, 301]),
+       parameter=st.text(alphabet='абв ab<&>', max_size=20))
+@settings(max_examples=16, deadline=None)
+def test_report_formula(age, parameter):
+    """проверяет фильтрацию правого отношения до левого соединения."""
     with TemporaryDirectory() as directory:
         app = create_app(f'{directory}/db.json', True)
-        seed_report(app.state.model, age, description)
+        seed_report(app.model, age, parameter)
+        client = ApiClient(transport=app.test_client())
         with patch('src.model.timestamp', return_value=NOW):
-            with TestClient(app) as transport:
-                client = ApiClient(transport=transport)
-                response = client.get_report_show()
-        expected = []
-        if age <= WINDOW_SECONDS:
-            expected = [{'description': description, 'output': 'a.docx'}]
+            response = client.list_report()
+        expected = {(parameter, None, None), ('empty', None, None),
+                    ('old', None, None)}
+        if age < WINDOW_SECONDS:
+            expected.remove((parameter, None, None))
+            expected.add((parameter, 0, 'a.docx'))
         assert response.status_code == OK
-        assert response.json() == expected
+        assert loads(response.content) == [
+            {'parameter': value, 'cache_hit': hit, 'output': output}
+            for value, hit, output in sorted(expected, key=repr)
+        ]
+        client.close()
+        app.worker.close()
+        app.model.storage.close()

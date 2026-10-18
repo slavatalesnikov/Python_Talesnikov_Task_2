@@ -1,44 +1,69 @@
-"""фоновое выполнение CLI через subprocess без блокировки HTTP-ответа."""
+"""асинхронный запуск CLI: файл на входе, Docx из stdout на диск."""
 
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 import subprocess
 import sys
-from pathlib import Path
+from time import monotonic
 from uuid import uuid4
 
 
 PROCESS_TIMEOUT = 60
+MILLISECONDS = 1000
 
 
 class Worker:
-    """связывает модель данных с утилитой первого этапа."""
+    """выполняет задачи в одном фоновом потоке, не задерживая HTTP-ответ."""
 
     def __init__(self, model, output_dir, test_mode=False):
-        """в тестовом режиме результат имитируется без запуска CLI."""
+        """в тестовом режиме subprocess заменяется тестовым результатом."""
         self.model = model
         self.output_dir = Path(output_dir).resolve()
         self.test_mode = test_mode
+        self.executor = ThreadPoolExecutor(max_workers=1)
 
-    def execute(self, instruction):
-        """запускается FastAPI после отправки ответа о принятой задаче.
-
-        Markdown передаётся через stdin без shell. имя результата задаётся
-        сервером, чтобы разные задачи не перезаписывали один документ.
-        """
-        uid = instruction['uid']
-        output = self.output_dir / f'{uid}-{uuid4().hex}.docx'
-        failure = ''
+    def submit(self, assignment):
+        """ставит реальную задачу в очередь, тестовую выполняет сразу."""
         if self.test_mode:
-            self.model.complete(uid, 'test.docx', failure)
-            return
+            self.execute(assignment)
+        else:
+            self.executor.submit(self.execute, assignment)
+
+    def convert_file(self, assignment):
+        """передаёт путь parameter и перехватывает бинарный stdout."""
+        filename = f'{assignment["identifier"]}-{uuid4().hex}.docx'
+        output = self.output_dir / filename
         try:
-            result = subprocess.run(
-                [sys.executable, '-m', 'src.converter', str(output)],
-                input=instruction['input'], text=True, encoding='utf-8',
-                capture_output=True, timeout=PROCESS_TIMEOUT,
-                cwd=Path(__file__).resolve().parents[1],
-            )
-            if result.returncode:
-                failure = result.stderr.strip() or 'ошибка преобразования'
-        except (OSError, subprocess.TimeoutExpired) as error:
-            failure = str(error)
-        self.model.complete(uid, '' if failure else str(output), failure)
+            self.output_dir.mkdir(parents=True, exist_ok=True)
+            with output.open('wb') as stream:
+                process = subprocess.run(
+                    [sys.executable, '-m', 'src.converter',
+                     assignment['parameter']], stdout=stream,
+                    stderr=subprocess.PIPE, timeout=PROCESS_TIMEOUT,
+                    cwd=Path(__file__).resolve().parents[1],
+                )
+            if process.returncode:
+                message = process.stderr.decode('utf-8', errors='replace')
+                raise ValueError(message.strip() or 'ошибка преобразования')
+            return {'output': str(output), 'exception': ''}
+        except (OSError, ValueError, subprocess.TimeoutExpired) as error:
+            output.unlink(missing_ok=True)
+            return {'output': '', 'exception': str(error)}
+
+    def execute(self, assignment):
+        """сохраняет время запуска, результат, длительность и текст ошибки."""
+        identifier = assignment['identifier']
+        if not self.model.start(identifier):
+            return
+        if self.test_mode:
+            self.model.complete(identifier, {'output': 'test.docx',
+                                             'exception': ''}, 0)
+            return
+        started = monotonic()
+        result = self.convert_file(assignment)
+        duration = int((monotonic() - started) * MILLISECONDS)
+        self.model.complete(identifier, result, duration)
+
+    def close(self):
+        """дожидается фоновых задач перед закрытием базы."""
+        self.executor.shutdown(wait=True)

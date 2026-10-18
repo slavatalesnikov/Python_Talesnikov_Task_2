@@ -1,61 +1,38 @@
-"""поля трёх таблиц из ER-диаграммы варианта 22."""
+"""поля ER-диаграммы варианта 24 и проверка их типов."""
 
 from time import time
 
-from pydantic import BaseModel, ConfigDict, Field
 
-
-REPORT_SECONDS = 6 * 60
+REPORT_SECONDS = 5 * 60
+FIELDS = {
+    'entity': {'identifier': int, 'created': int, 'ip': str,
+               'locale': str, 'platform': str},
+    'assignment': {'identifier': int, 'created': int, 'parameter': str,
+                   'entity': int, 'tags': str, 'stage': str, 'triggered': int},
+    'feedback': {'identifier': int, 'created': int, 'output': str,
+                 'stage': str, 'exception': str, 'assignment': int,
+                 'cache_hit': int, 'duration': int},
+}
+DEFAULTS = {
+    'entity': {'ip': '', 'locale': '', 'platform': ''},
+    'assignment': {'tags': '', 'stage': 'queued', 'triggered': 0},
+    'feedback': {'output': '', 'exception': '', 'cache_hit': 0, 'duration': 0},
+}
 
 
 def timestamp():
-    """возвращает целое число секунд Unix, как требует поле datetime."""
+    """возвращает целое число секунд Unix для полей времени."""
     return int(time())
 
 
-class ActorData(BaseModel):
-    """поля участника без первичного ключа, передаваемого в пути."""
-
-    model_config = ConfigDict(extra='forbid')
-    datetime: int = Field(default_factory=timestamp)
-    platform: str = ''
-    user_agent: str = ''
-
-
-class Actor(ActorData):
-    """полная запись Actor с целочисленным первичным ключом."""
-
-    uid: int
-
-
-class InstructionData(BaseModel):
-    """входные данные задачи; input содержит сам текст Markdown."""
-
-    model_config = ConfigDict(extra='forbid')
-    datetime: int = Field(default_factory=timestamp)
-    input: str
-    actor: int
-    description: str = ''
-    tags: str = ''
-    stage: str = 'queued'
-
-
-class Instruction(InstructionData):
-    """полная запись Instruction, связанная с Actor через actor."""
-
-    uid: int
-
-
-class Response(BaseModel):
-    """результат: output — путь к docx, failure — текст ошибки."""
-
-    model_config = ConfigDict(extra='forbid')
-    uid: int
-    datetime: int
-    output: str
-    stage: str
-    failure: str
-    instruction: int
-
-
-SCHEMAS = {'actor': Actor, 'instruction': Instruction, 'response': Response}
+def normalize(table, fields, complete=False):
+    """проверяет имена и преобразует строки XML в типы полей таблицы."""
+    if fields.keys() - FIELDS[table].keys():
+        raise ValueError('неизвестное поле')
+    if complete and fields.keys() != FIELDS[table].keys():
+        raise ValueError('не хватает обязательных полей')
+    try:
+        return {key: FIELDS[table][key](value)
+                for key, value in fields.items()}
+    except (TypeError, ValueError) as error:
+        raise ValueError('неверный тип поля') from error
