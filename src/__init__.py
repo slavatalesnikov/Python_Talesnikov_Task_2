@@ -1,1 +1,1 @@
-"""преобразование Markdown в Docx и HTTP API варианта 22."""
+"""преобразование Markdown в Docx и HTTP API варианта 24."""

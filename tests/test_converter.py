@@ -1,8 +1,9 @@
-"""проверка пяти примеров с настоящим запуском CLI."""
+"""пять примеров: входной файл Markdown и бинарный Docx в stdout."""
 
+from io import BytesIO
+from pathlib import Path
 import subprocess
 import sys
-from pathlib import Path
 
 import pytest
 from docx import Document
@@ -10,12 +11,14 @@ from docx import Document
 
 @pytest.mark.parametrize('source', sorted(Path('examples').glob('*.md')))
 def test_examples(source, tmp_path):
-    """проверяет создание читаемого docx и непустых абзацев."""
-    output = tmp_path / f'{source.stem}.docx'
+    """проверяет читаемость stdout как docx, без служебного текста."""
     result = subprocess.run(
-        [sys.executable, '-m', 'src.converter', str(output)],
-        input=source.read_text(encoding='utf-8'), text=True,
+        [sys.executable, '-m', 'src.converter', str(source)],
         capture_output=True, check=True,
     )
-    assert str(output) in result.stdout
-    assert any(p.text for p in Document(output).paragraphs)
+    document = Document(BytesIO(result.stdout))
+    output = tmp_path / f'{source.stem}.docx'
+    output.write_bytes(result.stdout)
+    assert any(paragraph.text for paragraph in document.paragraphs)
+    assert Document(output).paragraphs[0].text == document.paragraphs[0].text
+    assert result.stderr == b''

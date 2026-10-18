@@ -1,4 +1,4 @@
-"""чтение Markdown из stdin и сохранение документа на диск."""
+"""чтение Markdown из файла и вывод бинарного Docx в stdout."""
 
 import argparse
 import sys
@@ -76,18 +76,16 @@ def convert(text, output):
             block = add_block(document, token, lists)
             if block is not None:
                 paragraph = block
-    output = Path(output)
-    output.parent.mkdir(parents=True, exist_ok=True)
     document.save(output)
 
 
 def main():
-    """получает путь результата из аргумента, а Markdown — из stdin."""
+    """читает входной файл UTF-8 и пишет только байты Docx в stdout."""
     parser = argparse.ArgumentParser(description='Markdown -> Docx')
-    parser.add_argument('output', type=Path)
+    parser.add_argument('source', type=Path)
     args = parser.parse_args()
-    convert(sys.stdin.read(), args.output)
-    print(args.output)
+    text = args.source.read_text(encoding='utf-8')
+    convert(text, sys.stdout.buffer)
 
 
 if __name__ == '__main__':
