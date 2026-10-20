@@ -1,11 +1,19 @@
 """одиннадцать маршрутов таблицы 24; данные тела передаются в XML."""
 
+from pathlib import Path
+import subprocess
+import sys
+from time import monotonic
+from uuid import uuid4
+
 from flask import Blueprint, Response, current_app, request
 
 from src.xml_format import dumps, fields
 
 
 router = Blueprint('api', __name__, url_prefix='/api')
+PROCESS_TIMEOUT = 60
+MILLISECONDS = 1000
 
 
 def body():
@@ -46,8 +54,12 @@ def fetch_entity():
 @router.put('/make-assignment/<int:identifier>')
 def make_assignment(identifier):
     """создаёт задачу и ставит её в очередь фонового исполнителя."""
-    record = current_app.model.make_assignment(identifier, body())
-    current_app.worker.submit(record)
+    app = current_app._get_current_object()
+    record = app.model.make_assignment(identifier, body())
+    if app.config['TEST_MODE']:
+        execute_assignment(app, record)
+    else:
+        app.executor.submit(execute_assignment, app, record)
     return answer(record)
 
 
@@ -87,3 +99,40 @@ def fetch_feedback():
 def list_report():
     """строит отчёт по формуле 24; тело запроса не требуется."""
     return answer(current_app.model.list_report())
+
+
+def convert_assignment(app, assignment):
+    """запускает CLI первого этапа и сохраняет его stdout в Docx."""
+    filename = f'{assignment["identifier"]}-{uuid4().hex}.docx'
+    output = Path(app.config['OUTPUT_DIR']).resolve() / filename
+    try:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        with output.open('wb') as stream:
+            subprocess.run(
+                [sys.executable, '-m', 'src.converter',
+                 assignment['parameter']], stdout=stream,
+                stderr=subprocess.PIPE, check=True, timeout=PROCESS_TIMEOUT,
+                cwd=Path(__file__).resolve().parents[1],
+            )
+        return {'output': str(output), 'exception': ''}
+    except (OSError, subprocess.SubprocessError) as error:
+        output.unlink(missing_ok=True)
+        message = str(error)
+        if isinstance(error, subprocess.CalledProcessError):
+            message = error.stderr.decode('utf-8', errors='replace').strip()
+        return {'output': '', 'exception': message}
+
+
+def execute_assignment(app, assignment):
+    """выполняет задачу в фоне или сохраняет условный тестовый результат."""
+    identifier = assignment['identifier']
+    if not app.model.start(identifier):
+        return
+    if app.config['TEST_MODE']:
+        app.model.complete(identifier, {'output': 'test.docx',
+                                        'exception': ''}, 0)
+        return
+    started = monotonic()
+    result = convert_assignment(app, assignment)
+    duration = int((monotonic() - started) * MILLISECONDS)
+    app.model.complete(identifier, result, duration)

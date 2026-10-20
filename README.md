@@ -12,8 +12,10 @@ cd ~/Desktop/task2
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
 mkdir -p output
+pandoc --version
 ```
 
+Pandoc должен быть установлен отдельно и доступен командой pandoc.
 Сборка не требуется. `run.sh` запускает Python из окружения проекта.
 Пять файлов для демонстрации находятся в `examples`.
 
@@ -86,9 +88,9 @@ subprocess, передаёт путь Markdown аргументом и сохр�
 
 Функции и настройки
 
-- `converter`: main читает UTF-8 файл; convert создаёт Docx; add_block
-  оформляет блоки; add_inline переносит текст и выделение. Поддерживаются
-  заголовки, абзацы, списки, выделение, ссылки и блоки кода; цитаты — абзацы.
+- `converter`: argparse получает путь к файлу, subprocess запускает Pandoc.
+  Pandoc преобразует Markdown в Docx и выдаёт результат в stdout.
+  python-docx используется в тестах для проверки готовых документов.
 - `Model` и `ApiClient` имеют одинаковые 11 публичных методов: make_entity,
   discard_entity, list_entity, fetch_entity, make_assignment,
   discard_assignment, list_assignment, fetch_assignment, list_feedback,
@@ -102,8 +104,8 @@ subprocess, передаёт путь Markdown аргументом и сохр�
   Сохранение выполняется транзакцией; report использует ORM-подзапрос
   с фильтром времени, outerjoin и distinct.
 - `build_report` вычисляет формулу; normalize проверяет поля и типы.
-- `Worker.submit/execute/convert_file/close` ставит задачу в очередь,
-  выполняет её, запускает CLI и дожидается завершения.
+- `execute_assignment` запускает задачу; `convert_assignment` вызывает CLI.
+  Обе функции находятся в routes.py. ThreadPoolExecutor выполняет их в фоне.
 - `create_app` собирает Flask; authorize проверяет Basic Auth;
   bad_request и http_error оформляют ошибки; функции routes вызывают модель.
 - `xml_format` кодирует и разбирает XML: fill/dumps, read/loads, fields.
@@ -139,12 +141,11 @@ mkdir -p output
 
 Пункт 1. Входной файл и результат в стандартный вывод
 
-converter.py l82-88 — аргумент с путём, чтение файла UTF-8 и передача результата в `sys.stdout.buffer`.
-converter.py l58-79 — функция `convert`: разбирает Markdown и создаёт Docx.
-converter.py l7-8 — библиотеки `markdown-it-py` и `python-docx`.
+converter.py l5-7 — argparse получает путь к Markdown-файлу.
+converter.py l8-9 — subprocess запускает Pandoc, результат идёт в stdout.
 
-Что сделали: `MarkdownIt` разбирает оформление входного текста,
-`Document` создаёт документ Word. Готовые байты направляются в stdout.
+Что сделали: короткая программа передаёт файл Pandoc и выбирает формат Docx.
+Параметр `-o -` направляет готовый документ в стандартный вывод.
 Символ `>` в терминале сохраняет этот поток в файл.
 
 Как запустить:
@@ -164,8 +165,7 @@ Docx в стандартный вывод. Перенаправлением я �
 
 examples — пять исходных Markdown-файлов.
 test_converter.py l12-24 — проверка каждого примера через настоящий запуск CLI.
-converter.py l39-54 — оформление заголовков, абзацев, списков и кода.
-converter.py l14-36 — выделение текста и ссылки.
+converter.py l8-9 — Pandoc преобразует оформление Markdown в оформление Word.
 
 Что сделали: подготовили примеры с разным оформлением и проверяем,
 что каждый результат можно открыть как Docx.
@@ -195,7 +195,7 @@ converter.py l14-36 — выделение текста и ссылки.
 
 Пункт 3. Сохранение первого этапа коммитом
 
-Где смотреть: коммит a282955 — feat(part1).
+Где смотреть: коммит f1bc402 — refactor(part1), короткий конвертер через Pandoc.
 
 Что сделали: сохранили первый этап варианта 24 отдельным коммитом
 в формате Conventional Commits.
@@ -203,7 +203,7 @@ converter.py l14-36 — выделение текста и ссылки.
 Как показать в терминале:
 
 ```sh
-git show --stat a282955
+git show --stat f1bc402
 ```
 
 Результат первого этапа сохранён отдельным коммитом part1.
@@ -224,26 +224,26 @@ git show --stat a282955
 
 Пункт 1. Все обработчики таблицы 24 на Flask, ответы в XML
 
-api.py l49-63 — создание приложения Flask и подключение маршрутов.
+api.py l49-64 — создание приложения Flask и подключение маршрутов.
 server.py l11-30 — параметры команды и запуск сервера.
-routes.py l16-19 — `answer`: помещает XML в тело HTTP-ответа.
+routes.py l24-27 — `answer`: помещает XML в тело HTTP-ответа.
 xml_format.py l27-31 — сериализация XML через стандартный ElementTree.
 
 Все 11 обработчиков из таблицы:
 
 | Пункт таблицы | Метод и маршрут | Где показать |
 | --- | --- | --- |
-| 1.1 | PUT /api/make-entity/:identifier | routes.py l22 |
-| 1.2 | POST /api/discard-entity | routes.py l28 |
-| 1.3 | POST /api/list-entity | routes.py l34 |
-| 1.4 | GET /api/fetch-entity | routes.py l40 |
-| 2.1 | PUT /api/make-assignment/:identifier | routes.py l46 |
-| 2.2 | POST /api/discard-assignment | routes.py l54 |
-| 2.3 | POST /api/list-assignment/:entity | routes.py l60 |
-| 2.4 | GET /api/fetch-assignment | routes.py l66 |
-| 3.1 | POST /api/list-feedback/:assignment | routes.py l74 |
-| 3.2 | GET /api/fetch-feedback | routes.py l80 |
-| 4.1 | POST /api/list-report | routes.py l86 |
+| 1.1 | PUT /api/make-entity/:identifier | routes.py l30 |
+| 1.2 | POST /api/discard-entity | routes.py l36 |
+| 1.3 | POST /api/list-entity | routes.py l42 |
+| 1.4 | GET /api/fetch-entity | routes.py l48 |
+| 2.1 | PUT /api/make-assignment/:identifier | routes.py l54 |
+| 2.2 | POST /api/discard-assignment | routes.py l66 |
+| 2.3 | POST /api/list-assignment/:entity | routes.py l72 |
+| 2.4 | GET /api/fetch-assignment | routes.py l78 |
+| 3.1 | POST /api/list-feedback/:assignment | routes.py l86 |
+| 3.2 | GET /api/fetch-feedback | routes.py l92 |
+| 4.1 | POST /api/list-report | routes.py l98 |
 
 Что сделали: каждый HTTP-метод и маршрут связан с функцией Flask.
 Она читает параметры, вызывает модель данных и возвращает XML через answer.
@@ -271,8 +271,8 @@ demo.py l34-58.
 config.ini l1-3 — учебные имя и пароль student / student.
 config.py l9-14 — чтение реквизитов через ConfigParser.
 api.py l20-36 — проверка Basic Auth, ответ 401 и WWW-Authenticate при отказе.
-api.py l58 — проверка подключена перед каждым запросом.
-client.py l24-27 — клиент кодирует пару имя:пароль в Base64 и передаёт Authorization: Basic.
+api.py l59 — проверка подключена перед каждым запросом.
+client.py l25-28 — клиент кодирует пару имя:пароль в Base64 и передаёт Authorization: Basic.
 
 Что сделали: сервер сравнивает реквизиты запроса с конфигурацией.
 При ошибке возвращает 401 с XML. При верных реквизитах выполняется
@@ -294,22 +294,22 @@ Basic Auth проверяется перед обработчиками. Имя 
 
 Пункт 3. Выполнение через subprocess и тестовый режим
 
-routes.py l46-51 — создание Assignment и передача Worker.
-worker.py l18-30 — один фоновый поток и постановка задачи в очередь.
-worker.py l32-51 — subprocess запускает src.converter с путём parameter; stdout сохраняется в Docx.
-worker.py l53-65 — тестовый результат либо настоящее выполнение с замером времени.
+routes.py l54-63 — создание Assignment и отправка на выполнение.
+api.py l58 — ThreadPoolExecutor создаёт один фоновый поток.
+routes.py l104-123 — subprocess вызывает CLI; stdout сохраняется в Docx.
+routes.py l126-138 — тестовый ответ либо выполнение с замером времени.
 model.py l125-144 — сохранение Feedback и итогового stage.
 
-Что сделали: при создании задачи API возвращает запись с queued.
-Worker в фоне запускает утилиту первого этапа; результат получает done
-или failed. Клиент опрашивает Feedback, пока результат не появится.
-`parameter` — путь к Markdown-файлу на сервере; `output` — путь к Docx.
+Что сделали: API создаёт задачу и возвращает ответ, пока преобразование
+выполняется в фоне. Pandoc создаёт Docx; результат получает done или failed.
+Клиент через requests опрашивает Feedback до появления результата.
+`parameter` — путь к Markdown на сервере; `output` — путь к Docx.
 
 Как показать настоящее выполнение: при обычном JSON-сервере выполнить:
 
 ```sh
 ./run.sh -m src.demo
-./run.sh -m pytest tests/test_worker.py -v
+./run.sh -m pytest tests/test_execution.py -v
 ```
 
 Демонстрация обращается к работающему серверу. Тесты отдельно создают своё
@@ -341,9 +341,9 @@ CLI через subprocess. Тестовый режим подменяет выч
 Пункт 4. Класс API-клиента с именами методов как у модели
 
 client.py l11 — класс ApiClient.
-client.py l41-86 — 11 методов обращения к API.
+client.py l46-91 — 11 методов обращения к API.
 model.py l69-112 — соответствующие методы модели с такими же именами.
-client.py l21-39 — общая отправка HTTP через библиотеку httpx.
+client.py l22-44 — общая отправка HTTP через библиотеку requests.
 
 Что сделали: например, клиент make_entity отправляет HTTP-запрос,
 а модель make_entity создаёт запись. Так же совпадают имена остальных
@@ -393,12 +393,13 @@ test_protocol.py l19 — проверки конфигурации автори�
 test_protocol.py l42 — сгенерированные проверки ошибочного XML.
 
 Что сделали: измеряем покрытие API только тестами Hypothesis.
+test_execution.py дополнительно проверяет настоящий запуск Pandoc и ошибки.
 Обычные тесты пяти файлов CLI в эту команду не включены.
 
 Как сформировать и показать отчёт:
 
 ```sh
-./run.sh -m coverage run --branch --source=src -m pytest tests/test_api.py tests/test_report.py tests/test_protocol.py -q
+./run.sh -m coverage run --branch --source=src -m pytest tests/test_api.py tests/test_report.py tests/test_protocol.py tests/test_execution.py -q
 .venv/bin/coverage report -m --include='src/api.py,src/routes.py'
 ```
 
@@ -461,7 +462,7 @@ Docx. Показать файл data/variant24.sqlite3 в папке проек�
 
 Пункт 2. Замена слоя данных и повторное MBT API
 
-api.py l55-57 — выбор JsonStorage либо SqlStorage и подключение к модели.
+api.py l55-56 — выбор JsonStorage либо SqlStorage и подключение к модели.
 server.py l15-25 — параметр --backend и выбор файла базы.
 test_sql_api.py l8-16 — те же MBT-сценарии с backend=sqlite.
 test_api.py l50-53 — создание тестового приложения с выбранным хранилищем.
@@ -491,7 +492,7 @@ test_report.py l39-64 — проверки формулы на JSON и SQLite, �
 Как сформировать и показать отчёт:
 
 ```sh
-./run.sh -m coverage run --branch --source=src -m pytest tests/test_sql_api.py tests/test_report.py tests/test_protocol.py -q
+./run.sh -m coverage run --branch --source=src -m pytest tests/test_sql_api.py tests/test_report.py tests/test_protocol.py tests/test_execution.py -q
 .venv/bin/coverage report -m --include='src/api.py,src/routes.py'
 ```
 
@@ -529,7 +530,7 @@ git show --stat 32de20d
 ```
 
 Первая команда запускает все проверки. В сохранённом
-reports/final-tests.txt — 13 passed.
+reports/final-tests.txt — 14 passed.
 Вторая проверяет PEP8: отсутствие сообщений означает отсутствие ошибок.
 Третья показывает сложность функций. Результаты оформления и ограничений
 по длине функций сохранены в reports/quality.txt.

@@ -26,7 +26,7 @@ def main():
     try:
         app.run(host='127.0.0.1', port=args.port, threaded=True)
     finally:
-        app.worker.close()
+        app.executor.shutdown(wait=True)
         app.model.storage.close()
 
 

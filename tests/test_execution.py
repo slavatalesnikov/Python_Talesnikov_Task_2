@@ -10,6 +10,7 @@ from hypothesis import given, settings, strategies as st
 
 from src.api import create_app
 from src.client import ApiClient
+from src.routes import execute_assignment
 from src.xml_format import loads
 
 
@@ -22,13 +23,14 @@ def submit_document(app, path):
     assert client.make_entity(1, {}).status_code == OK
     response = client.make_assignment(1, {'entity': 1, 'parameter': str(path)})
     assert response.status_code == OK
-    app.worker.close()
+    app.executor.shutdown(wait=True)
     result = loads(client.list_feedback(1, {}).content)[0]
     client.close()
     return result
 
 
-@given(text=st.text(alphabet='абв abc012', min_size=1, max_size=30))
+@given(text=st.text(alphabet='абв abc012', min_size=1, max_size=30)
+       .filter(lambda text: bool(text.strip())))
 @settings(max_examples=5, deadline=None)
 def test_real_conversion(text):
     """читает созданный из бинарного stdout документ через python-docx."""
@@ -44,7 +46,25 @@ def test_real_conversion(text):
         paragraphs = Document(result['output']).paragraphs
         assert paragraphs[0].text == 'Заголовок'
         assert paragraphs[0].style.name == 'Heading 1'
-        assert paragraphs[1].text == text.strip()
+        assert paragraphs[1].text == ' '.join(text.split())
+        app.model.storage.close()
+
+
+@given(identifier=st.integers(min_value=1, max_value=1000))
+@settings(max_examples=5, deadline=None)
+def test_deleted_assignment(identifier):
+    """не запускает преобразование задачи, удалённой до её выполнения."""
+    with TemporaryDirectory() as directory:
+        app = create_app(f'{directory}/db.sqlite3', False,
+                         f'{directory}/output')
+        app.model.make_entity(1, {})
+        fields = {'entity': 1, 'parameter': 'a.md'}
+        record = app.model.make_assignment(identifier, fields)
+        app.model.discard_assignment({'identifier': identifier})
+        execute_assignment(app, record)
+        assert app.model.list_feedback(identifier, {}) == []
+        assert not Path(f'{directory}/output').exists()
+        app.executor.shutdown(wait=True)
         app.model.storage.close()
 
 
@@ -59,7 +79,7 @@ def test_conversion_failure(mode):
         if mode == 'missing':
             result = submit_document(app, f'{directory}/missing.md')
         else:
-            with patch('src.worker.subprocess.run', side_effect=errors[mode]):
+            with patch('src.routes.subprocess.run', side_effect=errors[mode]):
                 result = submit_document(app, 'example.md')
         assert result['stage'] == 'failed'
         assert result['output'] == ''

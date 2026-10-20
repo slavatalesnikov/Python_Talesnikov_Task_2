@@ -1,23 +1,25 @@
 200 <?xml version='1.0' encoding='utf-8'?>
-<response kind="object"><created type="int">1792349717</created><ip type="str">127.0.0.1</ip><locale type="str">ru</locale><platform type="str">mac</platform><identifier type="int">24001</identifier></response>
+<response kind="object"><created type="int">1792486405</created><ip type="str">127.0.0.1</ip><locale type="str">ru</locale><platform type="str">mac</platform><identifier type="int">24001</identifier></response>
 200 <?xml version='1.0' encoding='utf-8'?>
-<response kind="list"><item kind="object"><created type="int">1792349717</created><ip type="str">127.0.0.1</ip><locale type="str">ru</locale><platform type="str">mac</platform><identifier type="int">24001</identifier></item></response>
+<response kind="list"><item kind="object"><created type="int">1792486405</created><ip type="str">127.0.0.1</ip><locale type="str">ru</locale><platform type="str">mac</platform><identifier type="int">24001</identifier></item></response>
 200 <?xml version='1.0' encoding='utf-8'?>
-<response kind="object"><created type="int">1792349717</created><ip type="str">127.0.0.1</ip><locale type="str">ru</locale><platform type="str">mac</platform><identifier type="int">24001</identifier></response>
+<response kind="object"><created type="int">1792486405</created><ip type="str">127.0.0.1</ip><locale type="str">ru</locale><platform type="str">mac</platform><identifier type="int">24001</identifier></response>
 200 <?xml version='1.0' encoding='utf-8'?>
-<response kind="object"><created type="int">1792349717</created><tags type="str" /><stage type="str">queued</stage><triggered type="int">0</triggered><entity type="int">24001</entity><parameter type="str">examples/05-mixed.md</parameter><identifier type="int">24002</identifier></response>
+<response kind="object"><created type="int">1792486405</created><tags type="str" /><stage type="str">queued</stage><triggered type="int">0</triggered><entity type="int">24001</entity><parameter type="str">examples/05-mixed.md</parameter><identifier type="int">24002</identifier></response>
 200 <?xml version='1.0' encoding='utf-8'?>
 <response kind="list" />
 200 <?xml version='1.0' encoding='utf-8'?>
-<response kind="list"><item kind="object"><output type="str">/Users/slavatalesnikov/Desktop/task2/output/24002-37802fb736a94a5e812bcef02020db46.docx</output><exception type="str" /><identifier type="int">1</identifier><created type="int">1792349718</created><assignment type="int">24002</assignment><stage type="str">done</stage><cache_hit type="int">0</cache_hit><duration type="int">74</duration></item></response>
+<response kind="list" />
 200 <?xml version='1.0' encoding='utf-8'?>
-<response kind="list"><item kind="object"><created type="int">1792349717</created><tags type="str" /><stage type="str">done</stage><triggered type="int">1792349717</triggered><entity type="int">24001</entity><parameter type="str">examples/05-mixed.md</parameter><identifier type="int">24002</identifier></item></response>
+<response kind="list"><item kind="object"><output type="str">/private/tmp/task2-pandoc-json/24002-ea478b60240748898c743c336591e96d.docx</output><exception type="str" /><identifier type="int">1</identifier><created type="int">1792486405</created><assignment type="int">24002</assignment><stage type="str">done</stage><cache_hit type="int">0</cache_hit><duration type="int">154</duration></item></response>
 200 <?xml version='1.0' encoding='utf-8'?>
-<response kind="object"><created type="int">1792349717</created><tags type="str" /><stage type="str">done</stage><triggered type="int">1792349717</triggered><entity type="int">24001</entity><parameter type="str">examples/05-mixed.md</parameter><identifier type="int">24002</identifier></response>
+<response kind="list"><item kind="object"><created type="int">1792486405</created><tags type="str" /><stage type="str">done</stage><triggered type="int">1792486405</triggered><entity type="int">24001</entity><parameter type="str">examples/05-mixed.md</parameter><identifier type="int">24002</identifier></item></response>
 200 <?xml version='1.0' encoding='utf-8'?>
-<response kind="object"><output type="str">/Users/slavatalesnikov/Desktop/task2/output/24002-37802fb736a94a5e812bcef02020db46.docx</output><exception type="str" /><identifier type="int">1</identifier><created type="int">1792349718</created><assignment type="int">24002</assignment><stage type="str">done</stage><cache_hit type="int">0</cache_hit><duration type="int">74</duration></response>
+<response kind="object"><created type="int">1792486405</created><tags type="str" /><stage type="str">done</stage><triggered type="int">1792486405</triggered><entity type="int">24001</entity><parameter type="str">examples/05-mixed.md</parameter><identifier type="int">24002</identifier></response>
 200 <?xml version='1.0' encoding='utf-8'?>
-<response kind="list"><item kind="object"><parameter type="str">examples/05-mixed.md</parameter><cache_hit type="int">0</cache_hit><output type="str">/Users/slavatalesnikov/Desktop/task2/output/24002-37802fb736a94a5e812bcef02020db46.docx</output></item></response>
+<response kind="object"><output type="str">/private/tmp/task2-pandoc-json/24002-ea478b60240748898c743c336591e96d.docx</output><exception type="str" /><identifier type="int">1</identifier><created type="int">1792486405</created><assignment type="int">24002</assignment><stage type="str">done</stage><cache_hit type="int">0</cache_hit><duration type="int">154</duration></response>
+200 <?xml version='1.0' encoding='utf-8'?>
+<response kind="list"><item kind="object"><parameter type="str">examples/05-mixed.md</parameter><cache_hit type="int">0</cache_hit><output type="str">/private/tmp/task2-pandoc-json/24002-ea478b60240748898c743c336591e96d.docx</output></item></response>
 200 <?xml version='1.0' encoding='utf-8'?>
 <response kind="object"><deleted type="int">1</deleted></response>
 200 <?xml version='1.0' encoding='utf-8'?>

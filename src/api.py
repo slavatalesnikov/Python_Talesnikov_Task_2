@@ -1,5 +1,6 @@
 """приложение Flask с XML и Basic Auth по RFC 7617 для варианта 24."""
 
+from concurrent.futures import ThreadPoolExecutor
 from hmac import compare_digest
 
 from flask import Flask, current_app, request
@@ -10,7 +11,6 @@ from src.model import Model
 from src.routes import answer as xml_response, router
 from src.storage import JsonStorage
 from src.sql_storage import SqlStorage
-from src.worker import Worker
 
 
 UNAUTHORIZED = 401
@@ -54,7 +54,8 @@ def create_app(path='data/variant24.sqlite3', test_mode=False,
     app.config['API_AUTH'] = load_auth(config_path)
     storage = {'json': JsonStorage, 'sqlite': SqlStorage}[backend](path)
     app.model = Model(storage)
-    app.worker = Worker(app.model, output_dir, test_mode)
+    app.config.update(TEST_MODE=test_mode, OUTPUT_DIR=output_dir)
+    app.executor = ThreadPoolExecutor(max_workers=1)
     app.before_request(authorize)
     app.register_error_handler(ValueError, bad_request)
     app.register_error_handler(KeyError, bad_request)

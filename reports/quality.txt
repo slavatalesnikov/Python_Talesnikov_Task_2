@@ -1,6 +1,7 @@
-Variant 24: 24 Python files checked
+Variant 24: 23 Python files checked
 PEP8: passed, no errors
 Maximum function length: 25 lines (limit 40)
 Maximum argument count: 7 (limit 7)
 Line length: <= 79 characters
-Comments: lowercase docstrings only
+Comments: docstrings only
+CLI: 9 lines, Pandoc; HTTP client: requests

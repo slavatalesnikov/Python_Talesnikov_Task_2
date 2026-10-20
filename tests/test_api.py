@@ -220,7 +220,7 @@ class ApiMachine(RuleBasedStateMachine):
     def teardown(self):
         """освобождает транспорт, исполнитель, базу и временный каталог."""
         self.client.close()
-        self.app.worker.close()
+        self.app.executor.shutdown(wait=True)
         self.app.model.storage.close()
         self.clock.stop()
         self.directory.cleanup()

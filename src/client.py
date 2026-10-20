@@ -2,7 +2,7 @@
 
 from base64 import b64encode
 
-import httpx
+import requests
 
 from src.config import DEFAULT_CONFIG, load_auth
 from src.xml_format import dumps
@@ -16,7 +16,8 @@ class ApiClient:
         """читает Basic Auth из того же конфигурационного файла."""
         self.username, self.password = load_auth(config_path)
         self.transport = transport
-        self.http = httpx.Client(base_url=base_url, timeout=30)
+        self.base_url = base_url.rstrip('/')
+        self.http = requests.Session()
 
     def request(self, method, path, fields=None, query=None, headers=None,
                 raw=None):
@@ -33,10 +34,14 @@ class ApiClient:
         if self.transport is not None:
             result = self.transport.open(path, method=method, data=data,
                                          query_string=query, headers=values)
-            return httpx.Response(result.status_code, content=result.data,
-                                  headers=dict(result.headers))
-        return self.http.request(method, path, content=data,
-                                 params=query, headers=values)
+            response = requests.Response()
+            response.status_code = result.status_code
+            response._content = result.data
+            response.headers.update(result.headers)
+            response.encoding = 'utf-8'
+            return response
+        return self.http.request(method, self.base_url + path, data=data,
+                                 params=query, headers=values, timeout=30)
 
     def make_entity(self, identifier, fields):
         """создаёт Entity по ключу в пути и XML-телу."""

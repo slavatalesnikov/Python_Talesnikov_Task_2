@@ -35,7 +35,7 @@ def test_config_credentials(username, password):
         client.password += 'wrong'
         assert client.fetch_entity(999).status_code == UNAUTHORIZED
         client.close()
-        app.worker.close()
+        app.executor.shutdown(wait=True)
         app.model.storage.close()
 
 
@@ -53,5 +53,5 @@ def test_invalid_xml(payload):
         assert response.status_code == BAD_REQUEST
         assert 'error' in loads(response.content)
         client.close()
-        app.worker.close()
+        app.executor.shutdown(wait=True)
         app.model.storage.close()

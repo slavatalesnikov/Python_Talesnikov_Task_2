@@ -60,5 +60,5 @@ def test_report_formula(age, parameter, backend):
             for value, hit, output in sorted(expected, key=repr)
         ]
         client.close()
-        app.worker.close()
+        app.executor.shutdown(wait=True)
         app.model.storage.close()
