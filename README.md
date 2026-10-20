@@ -141,8 +141,8 @@ mkdir -p output
 
 Пункт 1. Входной файл и результат в стандартный вывод
 
-converter.py l5-7 — argparse получает путь к Markdown-файлу.
-converter.py l8-9 — subprocess запускает Pandoc, результат идёт в stdout.
+converter.py l4-6 — argparse получает путь к Markdown-файлу.
+converter.py l7-8 — subprocess запускает Pandoc, результат идёт в stdout.
 
 Что сделали: короткая программа передаёт файл Pandoc и выбирает формат Docx.
 Параметр `-o -` направляет готовый документ в стандартный вывод.
@@ -165,7 +165,7 @@ Docx в стандартный вывод. Перенаправлением я �
 
 examples — пять исходных Markdown-файлов.
 test_converter.py l12-24 — проверка каждого примера через настоящий запуск CLI.
-converter.py l8-9 — Pandoc преобразует оформление Markdown в оформление Word.
+converter.py l7-8 — Pandoc преобразует оформление Markdown в оформление Word.
 
 Что сделали: подготовили примеры с разным оформлением и проверяем,
 что каждый результат можно открыть как Docx.
@@ -227,7 +227,7 @@ git show --stat f1bc402
 api.py l49-64 — создание приложения Flask и подключение маршрутов.
 server.py l11-30 — параметры команды и запуск сервера.
 routes.py l24-27 — `answer`: помещает XML в тело HTTP-ответа.
-xml_format.py l27-31 — сериализация XML через стандартный ElementTree.
+xml_format.py l27-32 — сериализация XML через стандартный ElementTree.
 
 Все 11 обработчиков из таблицы:
 

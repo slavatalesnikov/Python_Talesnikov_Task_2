@@ -20,7 +20,7 @@ class SqlStorage:
         """создаёт SQLite-файл и таблицы по декларативным ORM-классам."""
         path = Path(path).resolve()
         path.parent.mkdir(parents=True, exist_ok=True)
-        self.engine = create_engine(f'sqlite:///{path}')
+        self.engine = create_engine('sqlite:///' + str(path))
         Base.metadata.create_all(self.engine)
 
     def load(self):

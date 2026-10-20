@@ -1,6 +1,6 @@
 """общий формат XML для клиента, сервера и примеров запросов."""
 
-from xml.etree import ElementTree as ET
+from xml.etree import ElementTree as element_tree
 
 
 def fill(element, value):
@@ -14,11 +14,11 @@ def fill(element, value):
     elif isinstance(value, dict):
         element.set('kind', 'object')
         for key, child in value.items():
-            fill(ET.SubElement(element, key), child)
+            fill(element_tree.SubElement(element, key), child)
     elif isinstance(value, list):
         element.set('kind', 'list')
         for child in value:
-            fill(ET.SubElement(element, 'item'), child)
+            fill(element_tree.SubElement(element, 'item'), child)
     else:
         element.set('type', 'int' if isinstance(value, int) else 'str')
         element.text = str(value)
@@ -26,9 +26,10 @@ def fill(element, value):
 
 def dumps(value, root='response'):
     """возвращает UTF-8 XML с декларацией кодировки."""
-    element = ET.Element(root)
+    element = element_tree.Element(root)
     fill(element, value)
-    return ET.tostring(element, encoding='utf-8', xml_declaration=True)
+    return element_tree.tostring(element, encoding='utf-8',
+                                 xml_declaration=True)
 
 
 def read(element):
@@ -47,8 +48,8 @@ def read(element):
 def loads(data):
     """разбирает ответ API или XML-тело запроса."""
     try:
-        return read(ET.fromstring(data))
-    except ET.ParseError as error:
+        return read(element_tree.fromstring(data))
+    except element_tree.ParseError as error:
         raise ValueError('некорректный XML') from error
 
 

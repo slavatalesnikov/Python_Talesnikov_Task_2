@@ -22,7 +22,7 @@ class ApiClient:
     def request(self, method, path, fields=None, query=None, headers=None,
                 raw=None):
         """отправляет XML с Basic Auth, возвращая обычный HTTP-ответ."""
-        credentials = f'{self.username}:{self.password}'.encode('utf-8')
+        credentials = (self.username + ':' + self.password).encode('utf-8')
         token = b64encode(credentials).decode('ascii')
         values = {'Authorization': f'Basic {token}',
                   'Content-Type': 'application/xml'}
