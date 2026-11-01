@@ -1,8 +1,9 @@
-Variant 24: 23 Python files checked
-PEP8: pycodestyle 2.15.0 and 2.8.0 passed, no errors
-Maximum function length: 25 lines (limit 40)
+Python files: 23
+PEP8: pycodestyle 2.15.0 and 2.8.0 passed
+Naming: import aliases, functions, arguments and variables passed
+Maximum function length: 25 (limit 40)
 Maximum argument count: 7 (limit 7)
-Line length: <= 79 characters
-Comments: docstrings only
-CLI: 8 lines, Pandoc; HTTP client: requests
-Naming: import aliases, functions, arguments and variables checked
+Line length: <= 79; file length: <= 1000
+Exact repeated blocks of 6 nonblank code lines in src: 0
+Complexity: A or B (radon)
+Basic Auth: requests auth parameter; no manual Base64

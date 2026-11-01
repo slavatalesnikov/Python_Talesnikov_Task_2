@@ -1,7 +1,5 @@
 """клиент XML API; имена методов совпадают с публичными методами модели."""
 
-from base64 import b64encode
-
 import requests
 
 from src.config import DEFAULT_CONFIG, load_auth
@@ -22,26 +20,23 @@ class ApiClient:
     def request(self, method, path, fields=None, query=None, headers=None,
                 raw=None):
         """отправляет XML с Basic Auth, возвращая обычный HTTP-ответ."""
-        credentials = (self.username + ':' + self.password).encode('utf-8')
-        token = b64encode(credentials).decode('ascii')
-        values = {'Authorization': f'Basic {token}',
-                  'Content-Type': 'application/xml'}
-        values.update(headers or {})
         data = b'' if fields is None else dumps(fields, 'request')
-        if raw is not None:
-            data = raw
-        path = '/api/' + path
+        message = requests.Request(
+            method, self.base_url + '/api/' + path,
+            data=data if raw is None else raw, params=query,
+            headers={'Content-Type': 'application/xml'},
+            auth=(self.username.encode(), self.password.encode()),
+        )
+        prepared = self.http.prepare_request(message)
+        prepared.headers.update(headers or {})
         if self.transport is not None:
-            result = self.transport.open(path, method=method, data=data,
-                                         query_string=query, headers=values)
-            response = requests.Response()
-            response.status_code = result.status_code
-            response._content = result.data
-            response.headers.update(result.headers)
-            response.encoding = 'utf-8'
+            response = self.transport.open(
+                prepared.path_url, method=method, data=prepared.body,
+                headers=dict(prepared.headers),
+            )
+            response.content = response.data
             return response
-        return self.http.request(method, self.base_url + path, data=data,
-                                 params=query, headers=values, timeout=30)
+        return self.http.send(prepared, timeout=30)
 
     def make_entity(self, identifier, fields):
         """создаёт Entity по ключу в пути и XML-телу."""
